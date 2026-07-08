@@ -933,6 +933,228 @@ TEST(no_cc_on_real_world) {
     ASSERT_FALSE(out.find("@*/") != std::string::npos);
 }
 
+// ── Test: flashChecker function with CC directives ────────────────────────────
+
+TEST(flash_checker_cc_on_bang) {
+    // Test the /*@cc_on!@*/ pattern - outputs content between @cc_on and @*/
+    std::string src = "var isIE = /*@cc_on!@*/0;\n";
+
+    std::string out = process(src);
+
+    // /*@cc_on!@*/ outputs "!", so result is !0
+    ASSERT_TRUE(out.find("var isIE = !0;") != std::string::npos);
+    ASSERT_FALSE(out.find("/*@cc_on") != std::string::npos);
+}
+
+TEST(flash_checker_cc_on_bang_in_function) {
+    // Test /*@cc_on!@*/ inside a function
+    std::string src =
+        "function flashChecker() {\n"
+        "    var hasFlash = 0;\n"
+        "    var flashVersion = 0;\n"
+        "    var isIE = /*@cc_on!@*/0;\n"
+        "    return {f: hasFlash, v: flashVersion};\n"
+        "}\n";
+
+    std::string out = process(src);
+
+    // /*@cc_on!@*/ outputs "!", making it !0
+    ASSERT_TRUE(out.find("var isIE = !0;") != std::string::npos);
+    ASSERT_FALSE(out.find("/*@cc_on") != std::string::npos);
+}
+
+TEST(flash_checker_full_function) {
+    // Test full flashChecker function with CC directive
+    std::string src =
+        "function flashChecker() {\n"
+        "    var hasFlash = 0;\n"
+        "    var flashVersion = 0;\n"
+        "    var isIE = /*@cc_on!@*/0;\n"
+        "\n"
+        "    if (isIE) {\n"
+        "        var swf = new ActiveXObject('ShockwaveFlash.ShockwaveFlash');\n"
+        "        if (swf) {\n"
+        "            hasFlash = 1;\n"
+        "            VSwf = swf.GetVariable('$version');\n"
+        "            flashVersion = parseInt(VSwf.split(' ')[1].split(',')[0]);\n"
+        "        }\n"
+        "    }\n"
+        "    return {f: hasFlash, v: flashVersion};\n"
+        "}\n";
+
+    std::string out = process(src);
+
+    // /*@cc_on!@*/ outputs "!", making it !0
+    ASSERT_TRUE(out.find("var isIE = !0;") != std::string::npos);
+    // Rest of the code should be preserved
+    ASSERT_TRUE(out.find("ActiveXObject") != std::string::npos);
+    ASSERT_TRUE(out.find("ShockwaveFlash") != std::string::npos);
+}
+
+TEST(flash_checker_with_plugins_code) {
+    // Test flashChecker with navigator.plugins detection
+    std::string src =
+        "function flashChecker() {\n"
+        "    var hasFlash = 0;\n"
+        "    var flashVersion = 0;\n"
+        "    var isIE = /*@cc_on!@*/0;\n"
+        "\n"
+        "    if (isIE) {\n"
+        "        var swf = new ActiveXObject('ShockwaveFlash.ShockwaveFlash');\n"
+        "    } else {\n"
+        "        if (navigator.plugins && navigator.plugins.length > 0) {\n"
+        "            var swf = navigator.plugins['Shockwave Flash'];\n"
+        "            if (swf) {\n"
+        "                hasFlash = 1;\n"
+        "            }\n"
+        "        }\n"
+        "    }\n"
+        "    return {f: hasFlash, v: flashVersion};\n"
+        "}\n";
+
+    std::string out = process(src);
+
+    // /*@cc_on!@*/ outputs "!", making it !0
+    ASSERT_TRUE(out.find("var isIE = !0;") != std::string::npos);
+    // Both code paths should be preserved
+    ASSERT_TRUE(out.find("navigator.plugins") != std::string::npos);
+    ASSERT_TRUE(out.find("Shockwave Flash") != std::string::npos);
+}
+
+TEST(flash_checker_with_cc_if_version_check) {
+    // Test flashChecker using @if to check JScript version
+    std::string src =
+        "function flashChecker() {\n"
+        "    var hasFlash = 0;\n"
+        "    var flashVersion = 0;\n"
+        "\n"
+        "/*@cc_on\n"
+        "    @if(@_jscript_version >= 5.6)\n"
+        "        var swf = new ActiveXObject('ShockwaveFlash.ShockwaveFlash');\n"
+        "        if (swf) {\n"
+        "            hasFlash = 1;\n"
+        "        }\n"
+        "    @else\n"
+        "        // Old IE without proper ActiveX support\n"
+        "        hasFlash = -1;\n"
+        "    @end\n"
+        "@*/\n"
+        "\n"
+        "    return {f: hasFlash, v: flashVersion};\n"
+        "}\n";
+
+    jscriptcc::CCEnvironment env;
+    env.set("@_jscript_version", jscriptcc::CCValue(5.8));
+    std::string out = process(src, env);
+
+    // Should take the >= 5.6 branch
+    ASSERT_TRUE(out.find("ActiveXObject") != std::string::npos);
+    ASSERT_FALSE(out.find("hasFlash = -1") != std::string::npos);
+    ASSERT_FALSE(out.find("@if") != std::string::npos);
+    ASSERT_FALSE(out.find("@*/") != std::string::npos);
+}
+
+TEST(flash_checker_with_cc_if_old_version) {
+    // Test flashChecker with old JScript version
+    std::string src =
+        "function flashChecker() {\n"
+        "    var hasFlash = 0;\n"
+        "\n"
+        "/*@cc_on\n"
+        "    @if(@_jscript_version >= 5.6)\n"
+        "        var swf = new ActiveXObject('ShockwaveFlash.ShockwaveFlash');\n"
+        "    @else\n"
+        "        hasFlash = -1;\n"
+        "    @end\n"
+        "@*/\n"
+        "\n"
+        "    return {f: hasFlash};\n"
+        "}\n";
+
+    jscriptcc::CCEnvironment env;
+    env.set("@_jscript_version", jscriptcc::CCValue(5.0));
+    std::string out = process(src, env);
+
+    // Should take the else branch
+    ASSERT_TRUE(out.find("hasFlash = -1") != std::string::npos);
+    ASSERT_FALSE(out.find("ActiveXObject") != std::string::npos);
+}
+
+// ── Test: @cc_on with various content after it ───────────────────────────────
+
+TEST(cc_on_bang_inline) {
+    // /*@cc_on!@*/ - outputs "!" as content
+    std::string src = "var x = /*@cc_on!@*/0;\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("var x = !0;") != std::string::npos);
+}
+
+TEST(cc_on_space_then_directive) {
+    // /*@cc_on @if(...)...@*/ - space after @cc_on, then directive
+    std::string src =
+        "/*@cc_on\n"
+        "    @if(1)\n"
+        "        var a = 1;\n"
+        "    @end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("var a = 1;") != std::string::npos);
+    ASSERT_FALSE(out.find("@if") != std::string::npos);
+}
+
+TEST(cc_on_newline_then_directive) {
+    // /*@cc_on\n@if(...)...@*/ - newline after @cc_on
+    std::string src =
+        "/*@cc_on\n"
+        "@if(@_jscript)\n"
+        "    alert('ie');\n"
+        "@end\n"
+        "@*/\n";
+    jscriptcc::CCEnvironment env;
+    env.set("@_jscript", jscriptcc::CCValue(1.0));
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('ie')") != std::string::npos);
+}
+
+TEST(cc_on_empty_block) {
+    // /*@cc_on @*/ - empty CC block
+    std::string src = "var x = 1; /*@cc_on @*/ var y = 2;\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("var x = 1;") != std::string::npos);
+    ASSERT_TRUE(out.find("var y = 2;") != std::string::npos);
+}
+
+TEST(cc_on_longer_identifier_not_matched) {
+    // /*@cc_onwards*/ - should NOT be recognized as CC block
+    std::string src = "var x = /*@cc_onwards*/;\n";
+    std::string out = process(src);
+    // Should pass through as normal JS (regular block comment)
+    ASSERT_TRUE(out.find("/*@cc_onwards*/") != std::string::npos);
+}
+
+TEST(cc_on_with_set) {
+    // /*@cc_on @set ... @*/ - @cc_on followed by @set
+    std::string src =
+        "/*@cc_on\n"
+        "    @set @x = 10\n"
+        "@*/\n"
+        "var result = /*@cc_on!@*/0;\n";
+    std::string out = process(src);
+    // @set has no output, @cc_on!@ outputs "!"
+    ASSERT_TRUE(out.find("var result = !0;") != std::string::npos);
+    ASSERT_FALSE(out.find("@set") != std::string::npos);
+}
+
+TEST(cc_on_multiple_bang_usages) {
+    // Multiple /*@cc_on!@*/ in one source
+    std::string src =
+        "var a = /*@cc_on!@*/0;\n"
+        "var b = /*@cc_on!@*/1;\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("var a = !0;") != std::string::npos);
+    ASSERT_TRUE(out.find("var b = !1;") != std::string::npos);
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 int main() {

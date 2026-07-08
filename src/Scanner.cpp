@@ -424,13 +424,11 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 std::size_t lookPos = pos_ + 2;
                 bool isCCBlock = false;
 
-                // Check for /*@cc_on
+                // Check for /*@cc_on (must not be part of a longer identifier like @cc_onwards)
                 if (lookPos + 6 <= size_ &&
                     std::memcmp(data_ + lookPos, "@cc_on", 6) == 0 &&
                     (lookPos + 6 >= size_ ||
-                     data_[lookPos + 6] == ' ' || data_[lookPos + 6] == '\t' ||
-                     data_[lookPos + 6] == '\n' || data_[lookPos + 6] == '\r' ||
-                     data_[lookPos + 6] == '*'))
+                     !(std::isalnum(static_cast<unsigned char>(data_[lookPos + 6])) || data_[lookPos + 6] == '_')))
                 {
                     isCCBlock = true;
                 }
