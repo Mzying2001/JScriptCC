@@ -579,6 +579,17 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                         while (pos_ < size_ && depth > 0) {
                             if (data_[pos_] == '{') ++depth;
                             else if (data_[pos_] == '}') { --depth; if (depth == 0) { adv(); break; } }
+                            // Handle strings inside template expression
+                            if (data_[pos_] == '\'' || data_[pos_] == '"') {
+                                char q = data_[pos_];
+                                adv();
+                                while (pos_ < size_ && data_[pos_] != q) {
+                                    if (data_[pos_] == '\\') { adv(); if (pos_ < size_) adv(); }
+                                    else { if (data_[pos_] == '\n') advanceLine(); adv(); }
+                                }
+                                if (pos_ < size_) adv();
+                                continue;
+                            }
                             if (data_[pos_] == '\n') advanceLine();
                             adv();
                         }

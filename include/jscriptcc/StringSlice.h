@@ -51,7 +51,9 @@ public:
 
     int compare(const StringSlice& other) const {
         std::size_t n = std::min(size_, other.size_);
-        int r = std::memcmp(data_, other.data_, n);
+        // memcmp with n==0 is a no-op, but passing nullptr is technically UB
+        // per C11 §7.24.1 even when n is zero. Guard against it.
+        int r = (n == 0) ? 0 : std::memcmp(data_, other.data_, n);
         if (r != 0) return r;
         if (size_ < other.size_) return -1;
         if (size_ > other.size_) return 1;

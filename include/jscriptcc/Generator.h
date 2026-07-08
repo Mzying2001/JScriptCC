@@ -27,15 +27,6 @@ private:
         CCEnvironment& env,
         std::string& output);
 
-    void processCCOnLine(
-        const char* sourceData,
-        std::size_t lineBegin,
-        std::size_t lineEnd,
-        std::size_t sourceSize,
-        CCEnvironment& env,
-        std::string& output,
-        CCErrorList* errors);
-
     CCErrorList* errors_ = nullptr;
 };
 

@@ -125,26 +125,4 @@ void Generator::processCCBlock(
     }
 }
 
-void Generator::processCCOnLine(
-    const char* sourceData,
-    std::size_t lineBegin,
-    std::size_t lineEnd,
-    std::size_t sourceSize,
-    CCEnvironment& env,
-    std::string& output,
-    CCErrorList* errors)
-{
-    // This handles the //@cc_on line and everything after it.
-    // The scanner already identified the CCOnLine segment and the subsequent
-    // CCBlock segment. So this method is not called directly for the rest.
-    // The //@cc_on line itself is skipped (not output).
-    (void)sourceData;
-    (void)lineBegin;
-    (void)lineEnd;
-    (void)sourceSize;
-    (void)env;
-    (void)output;
-    (void)errors;
-}
-
 } // namespace jscriptcc

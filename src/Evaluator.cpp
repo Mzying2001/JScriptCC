@@ -2,6 +2,7 @@
 #include <cmath>
 #include <cstring>
 #include <cstdlib>
+#include <limits>
 
 namespace jscriptcc {
 
@@ -106,11 +107,6 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
             return CCValue(s);
         }
 
-        case ExprType::BoolLiteral: {
-            std::string s = node.valueText.toString();
-            return CCValue(s == "true");
-        }
-
         case ExprType::Identifier: {
             std::string name = node.valueText.toString();
             const CCValue* val = env_->find(name);
@@ -140,7 +136,13 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
 
         case ExprType::Div: {
             double r = evalExpr(*node.right).toNumber();
-            if (r == 0) return CCValue(std::numeric_limits<double>::quiet_NaN());
+            if (r == 0) {
+                // Match JavaScript semantics: 0/0→NaN, n/0→±Infinity
+                double l = evalExpr(*node.left).toNumber();
+                if (l == 0) return CCValue(std::numeric_limits<double>::quiet_NaN());
+                return CCValue(l > 0 ? std::numeric_limits<double>::infinity()
+                                     : -std::numeric_limits<double>::infinity());
+            }
             return CCValue(evalExpr(*node.left).toNumber() / r);
         }
 

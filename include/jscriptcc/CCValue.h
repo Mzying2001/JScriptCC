@@ -1,6 +1,7 @@
 #pragma once
 #include <string>
 #include <cmath>
+#include <climits>
 #include <limits>
 
 namespace jscriptcc {
@@ -56,8 +57,16 @@ public:
             case TYPE_STRING: return str_;
             case TYPE_BOOL: return bool_ ? "true" : "false";
             case TYPE_NUMBER: {
-                if (num_ == static_cast<int>(num_) && !std::isnan(num_) && !std::isinf(num_)) {
-                    return std::to_string(static_cast<int>(num_));
+                // Safely check if the number is an integer without UB.
+                // static_cast<int> is undefined when the value is out of int range,
+                // so we range-check first using doubles (which can represent INT_MIN/INT_MAX).
+                if (!std::isnan(num_) && !std::isinf(num_) &&
+                    num_ >= static_cast<double>(INT_MIN) &&
+                    num_ <= static_cast<double>(INT_MAX)) {
+                    int i = static_cast<int>(num_);
+                    if (static_cast<double>(i) == num_) {
+                        return std::to_string(i);
+                    }
                 }
                 return std::to_string(num_);
             }
