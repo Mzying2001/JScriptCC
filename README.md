@@ -86,17 +86,19 @@ env.set("@VERSION", jscriptcc::CCValue("2.0"));    // string value
 
 Default predefined variables:
 
-| Variable           | Default | Description          |
-| ------------------ | ------- | -------------------- |
-| `@_jscript`        | 1       | Always 1 in JScript  |
-| `@_jscript_version`| 5.8     | JScript version      |
-| `@_win32`          | 1       | 32-bit Windows       |
-| `@_win64`          | 0       | 64-bit Windows       |
-| `@_win16`          | 0       | 16-bit Windows       |
-| `@_x86`            | 1       | x86 processor        |
-| `@_amd64`          | 0       | AMD64 processor      |
-| `@_mac`            | 0       | macOS                |
-| `@_debug`          | 0       | Debug mode           |
+| Variable           | Default               | Description          |
+| ------------------ | --------------------- | -------------------- |
+| `@_jscript`        | 1                     | Always 1 in JScript  |
+| `@_jscript_version`| 5.8                   | JScript version      |
+| `@_win16`          | 0                     | 16-bit Windows       |
+| `@_win32`          | `sizeof(void*) != 8`  | 32-bit Windows       |
+| `@_win64`          | `sizeof(void*) == 8`  | 64-bit Windows       |
+| `@_x86`            | `sizeof(void*) != 8`  | x86 processor        |
+| `@_amd64`          | `sizeof(void*) == 8`  | AMD64 processor      |
+| `@_mac`            | 0                     | macOS                |
+| `@_debug`          | 0                     | Debug mode           |
+
+> `@_win32`/`@_win64` and `@_x86`/`@_amd64` are set at compile time based on the program's pointer size. A 64-bit build gets `@_win64=1, @_amd64=1`; a 32-bit build gets `@_win32=1, @_x86=1`.
 
 ### CCError
 
