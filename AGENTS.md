@@ -20,6 +20,19 @@ alert(2);
 bar();
 ```
 
+Or equivalently (cc_on omitted, matching old IE behavior):
+
+```js
+foo();
+/*@if(@_win32)
+alert(1);
+@else
+alert(2);
+@end
+@*/
+bar();
+```
+
 Into this:
 
 ```js
@@ -81,6 +94,7 @@ Requires C++11. No third-party dependencies.
 - **No JS parser.** The Scanner only recognizes CC directives, strings, comments, regex, and template literals. Everything else is opaque text.
 - **`//@cc_on`** activates CC for the rest of the source (after the line).
 - **`/*@cc_on ... @*/`** is a self-contained CC block.
+- **`/*@if ... @*/`** (without `cc_on`) is also valid — matches old IE behavior where `cc_on` can be omitted in the block form. Same applies to `/*@elif`, `/*@else`, `/*@end`, `/*@set`.
 - **`// @cc_on`** (with space) is a regular comment, NOT a CC trigger.
 - **`/* @cc_on */`** (with space) is a regular block comment, NOT a CC trigger.
 - Expression parser uses Pratt parsing with correct operator precedence.

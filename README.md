@@ -8,6 +8,7 @@ A C++11 library that preprocesses IE JScript Conditional Compilation (`@cc_on`) 
 - No JS parser — modern JS (ES2025+) passes through untouched
 - Correctly ignores `@` directives inside strings, comments, regex, and template literals
 - Supports `/*@cc_on ... @*/` block form and `//@cc_on` line form
+- Also supports `/*@if ... @*/` without `cc_on` (matches old IE behavior)
 - Full expression evaluation with arithmetic, comparison, logical, and bitwise operators
 - Predefined variables: `@_jscript`, `@_jscript_version`, `@_win32`, `@_win64`, `@_x86`, `@_amd64`, `@_debug`, etc.
 - User-definable variables via `@set` and `CCEnvironment`
@@ -21,6 +22,7 @@ A C++11 library that preprocesses IE JScript Conditional Compilation (`@cc_on`) 
 #include <iostream>
 
 int main() {
+    // Both forms are equivalent:
     std::string source = R"(
         foo();
         /*@cc_on
@@ -32,6 +34,14 @@ int main() {
         @*/
         bar();
     )";
+
+    // Or without cc_on (matching old IE behavior):
+    // /*@if(@_win32)
+    // alert('Windows');
+    // @else
+    // alert('Other');
+    // @end
+    // @*/
 
     jscriptcc::CCPreprocessor pp;
     std::string output;
@@ -103,6 +113,7 @@ struct CCError {
 ```text
 /*@cc_on                    — activate CC (block form, until @*/)
 //@cc_on                    — activate CC (line form, rest of source)
+/*@if (condition)           — CC block without cc_on (matches old IE behavior)
 @if (condition)             — conditional branch
 @elif (condition)           — else-if branch
 @else                       — else branch
