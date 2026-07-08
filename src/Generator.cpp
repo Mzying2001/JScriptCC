@@ -63,7 +63,7 @@ void Generator::processCCBlock(
     std::size_t contentBegin = blockBegin;
     std::size_t contentEnd = blockEnd;
 
-    // Skip /*@cc_on and the newline after it
+    // Skip /*@cc_on (or /*@directive) and the newline after it
     if (contentBegin + 2 < blockEnd &&
         blockData[contentBegin] == '/' && blockData[contentBegin + 1] == '*') {
         contentBegin += 2; // skip /*
@@ -74,8 +74,11 @@ void Generator::processCCBlock(
         // Skip @cc_on
         if (p + 6 <= end && std::memcmp(p, "@cc_on", 6) == 0) {
             p += 6;
+        } else {
+            // Skip directive keyword (@if, @elif, @else, @end, @set)
+            while (p < end && (std::isalnum(static_cast<unsigned char>(*p)) || *p == '_')) ++p;
         }
-        // Skip whitespace and newline after @cc_on
+        // Skip whitespace and newline after @cc_on / directive
         while (p < end && (*p == ' ' || *p == '\t' || *p == '\r')) ++p;
         if (p < end && *p == '\n') ++p;
         contentBegin = static_cast<std::size_t>(p - blockData);

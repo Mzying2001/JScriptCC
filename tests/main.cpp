@@ -741,6 +741,198 @@ TEST(adjacent_cc_blocks) {
     ASSERT_TRUE(out.find("alert(2)") != std::string::npos);
 }
 
+// ── Test: /*@directive form without cc_on ────────────────────────────────────
+
+TEST(no_cc_on_basic_if) {
+    std::string src =
+        "foo();\n"
+        "/*@if(@_win32)\n"
+        "alert(1);\n"
+        "@end\n"
+        "@*/\n"
+        "bar();\n";
+
+    jscriptcc::CCEnvironment env;
+    env.set("@_win32", jscriptcc::CCValue(1.0));
+    std::string out = process(src, env);
+
+    ASSERT_TRUE(out.find("foo();") != std::string::npos);
+    ASSERT_TRUE(out.find("alert(1);") != std::string::npos);
+    ASSERT_TRUE(out.find("bar();") != std::string::npos);
+    ASSERT_FALSE(out.find("@if") != std::string::npos);
+    ASSERT_FALSE(out.find("@end") != std::string::npos);
+}
+
+TEST(no_cc_on_if_false) {
+    std::string src =
+        "/*@if(@_win32)\n"
+        "alert(1);\n"
+        "@end\n"
+        "@*/\n";
+
+    jscriptcc::CCEnvironment env;
+    env.set("@_win32", jscriptcc::CCValue(0.0));
+    std::string out = process(src, env);
+
+    ASSERT_FALSE(out.find("alert(1);") != std::string::npos);
+}
+
+TEST(no_cc_on_if_else) {
+    std::string src =
+        "/*@if(@_win32)\n"
+        "alert('win32');\n"
+        "@else\n"
+        "alert('other');\n"
+        "@end\n"
+        "@*/\n";
+
+    jscriptcc::CCEnvironment env;
+    env.set("@_win32", jscriptcc::CCValue(0.0));
+    std::string out = process(src, env);
+
+    ASSERT_TRUE(out.find("alert('other');") != std::string::npos);
+    ASSERT_FALSE(out.find("alert('win32');") != std::string::npos);
+}
+
+TEST(no_cc_on_if_elif_else) {
+    std::string src =
+        "/*@if(@_jscript_version >= 9)\n"
+        "alert('ie9+');\n"
+        "@elif(@_jscript_version >= 5)\n"
+        "alert('ie5+');\n"
+        "@else\n"
+        "alert('old');\n"
+        "@end\n"
+        "@*/\n";
+
+    jscriptcc::CCEnvironment env;
+    env.set("@_jscript_version", jscriptcc::CCValue(5.8));
+    std::string out = process(src, env);
+
+    ASSERT_TRUE(out.find("alert('ie5+');") != std::string::npos);
+    ASSERT_FALSE(out.find("alert('ie9+');") != std::string::npos);
+    ASSERT_FALSE(out.find("alert('old');") != std::string::npos);
+}
+
+TEST(no_cc_on_nested_if) {
+    std::string src =
+        "/*@if(@_win32)\n"
+        "@if(@_jscript_version >= 5)\n"
+        "alert('win32 ie5+');\n"
+        "@else\n"
+        "alert('win32 old');\n"
+        "@end\n"
+        "@else\n"
+        "alert('not win32');\n"
+        "@end\n"
+        "@*/\n";
+
+    jscriptcc::CCEnvironment env;
+    env.set("@_win32", jscriptcc::CCValue(1.0));
+    env.set("@_jscript_version", jscriptcc::CCValue(5.8));
+    std::string out = process(src, env);
+
+    ASSERT_TRUE(out.find("alert('win32 ie5+');") != std::string::npos);
+    ASSERT_FALSE(out.find("alert('win32 old');") != std::string::npos);
+    ASSERT_FALSE(out.find("alert('not win32');") != std::string::npos);
+}
+
+TEST(no_cc_on_set) {
+    std::string src =
+        "/*@set @DEBUG = 1\n"
+        "@if(@DEBUG)\n"
+        "console.log('debug');\n"
+        "@end\n"
+        "@*/\n";
+
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("console.log('debug');") != std::string::npos);
+}
+
+TEST(no_cc_on_multiple_blocks) {
+    std::string src =
+        "foo();\n"
+        "/*@if(@_win32)\n"
+        "alert('first');\n"
+        "@end\n"
+        "@*/\n"
+        "bar();\n"
+        "/*@if(@_win32)\n"
+        "alert('second');\n"
+        "@end\n"
+        "@*/\n"
+        "baz();\n";
+
+    jscriptcc::CCEnvironment env;
+    env.set("@_win32", jscriptcc::CCValue(1.0));
+    std::string out = process(src, env);
+
+    ASSERT_TRUE(out.find("foo();") != std::string::npos);
+    ASSERT_TRUE(out.find("alert('first');") != std::string::npos);
+    ASSERT_TRUE(out.find("bar();") != std::string::npos);
+    ASSERT_TRUE(out.find("alert('second');") != std::string::npos);
+    ASSERT_TRUE(out.find("baz();") != std::string::npos);
+}
+
+TEST(no_cc_on_adjacent_blocks) {
+    std::string src =
+        "/*@if(@_win32) alert(1); @end @*/\n"
+        "/*@if(@_win32) alert(2); @end @*/\n";
+
+    jscriptcc::CCEnvironment env;
+    env.set("@_win32", jscriptcc::CCValue(1.0));
+    std::string out = process(src, env);
+
+    ASSERT_TRUE(out.find("alert(1)") != std::string::npos);
+    ASSERT_TRUE(out.find("alert(2)") != std::string::npos);
+}
+
+TEST(no_cc_on_with_space_is_regular_comment) {
+    // /* @if (with space after /*) should NOT trigger CC
+    std::string src = "/* @if */\n/* @end */\nvar x = 1;\n";
+    ASSERT_EQ(process(src), src);
+}
+
+TEST(no_cc_on_string_with_directive) {
+    // Strings containing @if should not be affected
+    std::string src =
+        "/*@if(@_win32)\n"
+        "var s = '@end';\n"
+        "@end\n"
+        "@*/\n";
+
+    jscriptcc::CCEnvironment env;
+    env.set("@_win32", jscriptcc::CCValue(1.0));
+    std::string out = process(src, env);
+
+    ASSERT_TRUE(out.find("var s = '@end';") != std::string::npos);
+}
+
+TEST(no_cc_on_real_world) {
+    std::string src =
+        "(function() {\n"
+        "    var version = '2.0';\n"
+        "\n"
+        "/*@if(@_jscript_version >= 5.8)\n"
+        "    version = '2.0-ie8';\n"
+        "@else\n"
+        "    version = '2.0-old';\n"
+        "@end\n"
+        "@*/\n"
+        "\n"
+        "    console.log(version);\n"
+        "})();\n";
+
+    jscriptcc::CCEnvironment env;
+    env.set("@_jscript_version", jscriptcc::CCValue(5.8));
+    std::string out = process(src, env);
+
+    ASSERT_TRUE(out.find("version = '2.0-ie8'") != std::string::npos);
+    ASSERT_FALSE(out.find("version = '2.0-old'") != std::string::npos);
+    ASSERT_FALSE(out.find("/*@if") != std::string::npos);
+    ASSERT_FALSE(out.find("@*/") != std::string::npos);
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 int main() {

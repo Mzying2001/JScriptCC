@@ -183,7 +183,6 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                     std::memcmp(data_ + lookPos, "@cc_on", 6) == 0 &&
                     (lookPos + 6 >= size_ || !std::isalnum(static_cast<unsigned char>(data_[lookPos + 6]))))
                 {
-                    // //@cc_on found
                     if (pos_ > segmentStart) {
                         emitSegment(SegmentType::NormalJS, segmentStart, pos_);
                     }
@@ -421,8 +420,11 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
 
             // Block comment
             if (c == '/' && pos_ + 1 < size_ && data_[pos_ + 1] == '*') {
-                // Check for /*@cc_on (must be immediately after /*, no spaces)
+                // Check for /*@cc_on or /*@directive (must be immediately after /*, no spaces)
                 std::size_t lookPos = pos_ + 2;
+                bool isCCBlock = false;
+
+                // Check for /*@cc_on
                 if (lookPos + 6 <= size_ &&
                     std::memcmp(data_ + lookPos, "@cc_on", 6) == 0 &&
                     (lookPos + 6 >= size_ ||
@@ -430,7 +432,31 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                      data_[lookPos + 6] == '\n' || data_[lookPos + 6] == '\r' ||
                      data_[lookPos + 6] == '*'))
                 {
-                    // /*@cc_on ... @*/
+                    isCCBlock = true;
+                }
+
+                // Check for /*@directive (@if, @elif, @else, @end, @set)
+                if (!isCCBlock && lookPos + 3 <= size_ && data_[lookPos] == '@') {
+                    auto isIdentChar = [](char ch) -> bool {
+                        return std::isalnum(static_cast<unsigned char>(ch)) || ch == '_';
+                    };
+                    struct DirCheck { const char* name; std::size_t len; };
+                    DirCheck dirs[] = {
+                        {"@if", 3}, {"@elif", 5}, {"@else", 5},
+                        {"@end", 4}, {"@set", 4}
+                    };
+                    for (auto& d : dirs) {
+                        if (lookPos + d.len <= size_ &&
+                            std::memcmp(data_ + lookPos, d.name, d.len) == 0 &&
+                            (lookPos + d.len >= size_ || !isIdentChar(data_[lookPos + d.len])))
+                        {
+                            isCCBlock = true;
+                            break;
+                        }
+                    }
+                }
+
+                if (isCCBlock) {
                     if (pos_ > segmentStart) {
                         emitSegment(SegmentType::NormalJS, segmentStart, pos_);
                     }
