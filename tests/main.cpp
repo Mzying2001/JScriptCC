@@ -1155,6 +1155,219 @@ TEST(cc_on_multiple_bang_usages) {
     ASSERT_TRUE(out.find("var b = !1;") != std::string::npos);
 }
 
+// ── Test: Division and modulo expressions ───────────────────────────────────
+
+TEST(expr_division) {
+    // 10 / 3 == 3 is false (integer division doesn't exist in JS), use 9/3
+    std::string src =
+        "/*@cc_on\n"
+        "@set @a = 9\n"
+        "@set @b = 3\n"
+        "@if(@a / @b == 3)\n"
+        "alert('div');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('div');") != std::string::npos);
+}
+
+TEST(expr_modulo) {
+    std::string src =
+        "/*@cc_on\n"
+        "@set @a = 10\n"
+        "@set @b = 3\n"
+        "@if(@a % @b == 1)\n"
+        "alert('mod');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('mod');") != std::string::npos);
+}
+
+TEST(expr_division_by_zero) {
+    // Division by zero should produce Infinity, not crash
+    std::string src =
+        "/*@cc_on\n"
+        "@if(1 / 0 > 1000000)\n"
+        "alert('inf');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('inf');") != std::string::npos);
+}
+
+TEST(expr_modulo_by_zero) {
+    // Modulo by zero should produce NaN, not crash
+    std::string src =
+        "/*@cc_on\n"
+        "@if(1 % 0 != 1 % 0)\n"
+        "alert('nan');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('nan');") != std::string::npos);
+}
+
+// ── Test: Bitwise operations with edge cases ───────────────────────────────
+
+TEST(expr_bitnot) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if(~0 == -1)\n"
+        "alert('ok');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
+}
+
+TEST(expr_bitwise_large_number) {
+    // Large numbers should not crash (safeToInt32 handles out-of-range)
+    std::string src =
+        "/*@cc_on\n"
+        "@set @big = 1000000000000\n"
+        "@if((@big & 0xFF) >= 0)\n"
+        "alert('ok');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
+}
+
+TEST(expr_bitwise_or) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if((0x0F | 0xF0) == 0xFF)\n"
+        "alert('ok');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
+}
+
+TEST(expr_bitwise_xor) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if((0xFF ^ 0x0F) == 0xF0)\n"
+        "alert('ok');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
+}
+
+// ── Test: Comparison operators ─────────────────────────────────────────────
+
+TEST(expr_lt) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if(1 < 2)\n"
+        "alert('ok');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
+}
+
+TEST(expr_le) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if(1 <= 1)\n"
+        "alert('ok');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
+}
+
+TEST(expr_gt) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if(2 > 1)\n"
+        "alert('ok');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
+}
+
+TEST(expr_ne) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if(1 != 2)\n"
+        "alert('ok');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
+}
+
+TEST(expr_eq) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if(1 == 1)\n"
+        "alert('ok');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
+}
+
+// ── Test: Regex vs division in normal JS ───────────────────────────────────
+
+TEST(regex_after_identifier_is_division) {
+    // After a plain identifier, / should be division, not regex
+    std::string src = "var x = a / b;\n";
+    ASSERT_EQ(process(src), src);
+}
+
+TEST(regex_after_operator) {
+    // After an operator like =, / should be regex
+    std::string src = "var r = /test/;\n";
+    ASSERT_EQ(process(src), src);
+}
+
+TEST(regex_after_return) {
+    // After return keyword, / should be regex
+    std::string src = "return /test/;\n";
+    ASSERT_EQ(process(src), src);
+}
+
+TEST(regex_in_normal_js_preserved) {
+    // Regex in normal JS (not in CC block) should pass through
+    std::string src = "var r = /hello/gi;\n";
+    ASSERT_EQ(process(src), src);
+}
+
+TEST(division_in_expression_preserved) {
+    // Division in expressions should pass through
+    std::string src = "var result = 10 / 2 / 5;\n";
+    ASSERT_EQ(process(src), src);
+}
+
+// ── Test: Nested @elif chains ──────────────────────────────────────────────
+
+TEST(cc_multiple_elif) {
+    std::string src =
+        "/*@cc_on\n"
+        "@set @v = 3\n"
+        "@if(@v == 1)\n"
+        "alert(1);\n"
+        "@elif(@v == 2)\n"
+        "alert(2);\n"
+        "@elif(@v == 3)\n"
+        "alert(3);\n"
+        "@else\n"
+        "alert(4);\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert(3);") != std::string::npos);
+    ASSERT_FALSE(out.find("alert(1);") != std::string::npos);
+    ASSERT_FALSE(out.find("alert(2);") != std::string::npos);
+    ASSERT_FALSE(out.find("alert(4);") != std::string::npos);
+}
+
 // ── Main ─────────────────────────────────────────────────────────────────────
 
 int main() {

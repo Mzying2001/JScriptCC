@@ -10,15 +10,9 @@ char Scanner::peek(std::size_t offset) const {
     return (p < size_) ? data_[p] : '\0';
 }
 
-char Scanner::peekNext(std::size_t offset) const {
-    return peek(offset + 1);
-}
-
-bool Scanner::matchAhead(const char* s, std::size_t offset) const {
-    std::size_t slen = std::strlen(s);
-    std::size_t p = pos_ + offset;
-    if (p + slen > size_) return false;
-    return std::memcmp(data_ + p, s, slen) == 0;
+void Scanner::adv() {
+    ++pos_;
+    ++col_;
 }
 
 void Scanner::emitSegment(SegmentType type, std::size_t begin, std::size_t end) {
@@ -38,6 +32,114 @@ void Scanner::advanceLine() {
     col_ = 1;
 }
 
+void Scanner::skipQuotedString(char quote) {
+    // Called after the opening quote is consumed.
+    // Advances past the closing quote.
+    while (pos_ < size_) {
+        if (data_[pos_] == '\\') {
+            adv();
+            if (pos_ < size_) {
+                if (data_[pos_] == '\n') advanceLine();
+                adv();
+            }
+        } else if (data_[pos_] == quote) {
+            adv();
+            return;
+        } else {
+            if (data_[pos_] == '\n') advanceLine();
+            adv();
+        }
+    }
+}
+
+void Scanner::skipTemplateExpression() {
+    // Called after the opening '{' of ${...} is consumed.
+    // Advances past the matching '}'.
+    int depth = 1;
+    while (pos_ < size_ && depth > 0) {
+        if (data_[pos_] == '{') {
+            ++depth;
+            adv();
+        } else if (data_[pos_] == '}') {
+            --depth;
+            if (depth == 0) { adv(); return; }
+            adv();
+        } else if (data_[pos_] == '\'' || data_[pos_] == '"') {
+            skipQuotedString(data_[pos_]);
+        } else {
+            if (data_[pos_] == '\n') advanceLine();
+            adv();
+        }
+    }
+}
+
+void Scanner::skipTemplateString() {
+    // Called after the opening backtick is consumed.
+    // Advances past the closing backtick.
+    while (pos_ < size_) {
+        if (data_[pos_] == '\\') {
+            adv();
+            if (pos_ < size_) {
+                if (data_[pos_] == '\n') advanceLine();
+                adv();
+            }
+        } else if (data_[pos_] == '`') {
+            adv();
+            return;
+        } else if (data_[pos_] == '$' && pos_ + 1 < size_ && data_[pos_ + 1] == '{') {
+            adv(); adv(); // skip ${
+            skipTemplateExpression();
+        } else {
+            if (data_[pos_] == '\n') advanceLine();
+            adv();
+        }
+    }
+}
+
+void Scanner::skipLineComment() {
+    // Advances past the newline (or to end of source).
+    while (pos_ < size_ && data_[pos_] != '\n') adv();
+}
+
+void Scanner::skipBlockComment() {
+    // Called after the opening /* is consumed.
+    // Advances past the closing */.
+    while (pos_ < size_) {
+        if (data_[pos_] == '*' && pos_ + 1 < size_ && data_[pos_ + 1] == '/') {
+            adv(); adv();
+            return;
+        }
+        if (data_[pos_] == '\n') advanceLine();
+        adv();
+    }
+}
+
+void Scanner::skipRegexLiteral() {
+    // Called after the opening / is consumed.
+    // Advances past the closing / and any flags.
+    while (pos_ < size_) {
+        if (data_[pos_] == '\\') {
+            adv();
+            if (pos_ < size_) adv();
+        } else if (data_[pos_] == '/') {
+            adv();
+            break;
+        } else if (data_[pos_] == '[') {
+            adv();
+            while (pos_ < size_ && data_[pos_] != ']') {
+                if (data_[pos_] == '\\') { adv(); if (pos_ < size_) adv(); }
+                else adv();
+            }
+            if (pos_ < size_) adv(); // skip ]
+        } else {
+            if (data_[pos_] == '\n') advanceLine();
+            adv();
+        }
+    }
+    // Skip regex flags
+    while (pos_ < size_ && std::isalpha(static_cast<unsigned char>(data_[pos_]))) adv();
+}
+
 bool Scanner::isRegexPosition() const {
     if (lastSignificantChar_ == 0) return true;
     switch (lastSignificantChar_) {
@@ -47,7 +149,7 @@ bool Scanner::isRegexPosition() const {
         case '\n': case '>':
             return true;
         default:
-            return lastWasKeyword_ || lastWasOperator_;
+            return lastWasRegexKeyword_ || lastWasOperator_;
     }
 }
 
@@ -61,20 +163,15 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
     col_ = 1;
     errors_ = errors;
     segments_.clear();
+    std::size_t errorCount = errors_ ? errors_->size() : 0;
     lastSignificantChar_ = 0;
     lastWasOperator_ = false;
-    lastWasKeyword_ = false;
-    templateBraceDepth_ = 0;
+    lastWasRegexKeyword_ = false;
+    lastIdentifier_.clear();
 
     std::size_t segmentStart = 0;
     State state = State::Default;
     std::size_t ccBlockStart = 0;
-
-    // Advance helper that also updates position
-    auto adv = [&]() {
-        ++pos_;
-        ++col_;
-    };
 
     while (pos_ < size_) {
         char c = data_[pos_];
@@ -87,91 +184,30 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
             if (c == '\'') {
                 lastSignificantChar_ = c;
                 lastWasOperator_ = false;
-                lastWasKeyword_ = false;
+                lastWasRegexKeyword_ = false;
+                lastIdentifier_.clear();
                 adv();
-                while (pos_ < size_) {
-                    if (data_[pos_] == '\\') {
-                        adv();
-                        if (pos_ < size_) {
-                            if (data_[pos_] == '\n') advanceLine();
-                            adv();
-                        }
-                    } else if (data_[pos_] == '\'') {
-                        adv();
-                        break;
-                    } else {
-                        if (data_[pos_] == '\n') advanceLine();
-                        adv();
-                    }
-                }
+                skipQuotedString('\'');
                 continue;
             }
             // Double-quote string
             if (c == '"') {
                 lastSignificantChar_ = c;
                 lastWasOperator_ = false;
-                lastWasKeyword_ = false;
+                lastWasRegexKeyword_ = false;
+                lastIdentifier_.clear();
                 adv();
-                while (pos_ < size_) {
-                    if (data_[pos_] == '\\') {
-                        adv();
-                        if (pos_ < size_) {
-                            if (data_[pos_] == '\n') advanceLine();
-                            adv();
-                        }
-                    } else if (data_[pos_] == '"') {
-                        adv();
-                        break;
-                    } else {
-                        if (data_[pos_] == '\n') advanceLine();
-                        adv();
-                    }
-                }
+                skipQuotedString('"');
                 continue;
             }
             // Template string
             if (c == '`') {
                 lastSignificantChar_ = c;
                 lastWasOperator_ = false;
-                lastWasKeyword_ = false;
+                lastWasRegexKeyword_ = false;
+                lastIdentifier_.clear();
                 adv();
-                while (pos_ < size_) {
-                    if (data_[pos_] == '\\') {
-                        adv();
-                        if (pos_ < size_) {
-                            if (data_[pos_] == '\n') advanceLine();
-                            adv();
-                        }
-                    } else if (data_[pos_] == '`') {
-                        adv();
-                        break;
-                    } else if (data_[pos_] == '$' && pos_ + 1 < size_ && data_[pos_ + 1] == '{') {
-                        // Template expression
-                        int depth = 1;
-                        adv(); adv(); // skip ${
-                        while (pos_ < size_ && depth > 0) {
-                            if (data_[pos_] == '{') ++depth;
-                            else if (data_[pos_] == '}') { --depth; if (depth == 0) { adv(); break; } }
-                            // Handle strings inside template expression
-                            if (data_[pos_] == '\'' || data_[pos_] == '"') {
-                                char q = data_[pos_];
-                                adv();
-                                while (pos_ < size_ && data_[pos_] != q) {
-                                    if (data_[pos_] == '\\') { adv(); if (pos_ < size_) adv(); }
-                                    else { if (data_[pos_] == '\n') advanceLine(); adv(); }
-                                }
-                                if (pos_ < size_) adv();
-                                continue;
-                            }
-                            if (data_[pos_] == '\n') advanceLine();
-                            adv();
-                        }
-                        continue;
-                    } else {
-                        if (data_[pos_] == '\n') advanceLine();
-                        adv();
-                    }
-                }
+                skipTemplateString();
                 continue;
             }
 
@@ -199,126 +235,73 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                     // Now scan the rest of the source for @ directives.
                     // Everything between directives is normal JS.
                     // We need to track strings/comments to avoid false matches.
-                    std::size_t ccRestStart = pos_;
-                    bool hadDirective = false;
-
                     while (pos_ < size_) {
                         c = data_[pos_];
 
                         // Skip strings
                         if (c == '\'' || c == '"') {
-                            char q = c;
                             adv();
-                            while (pos_ < size_) {
-                                if (data_[pos_] == '\\') {
-                                    adv();
-                                    if (pos_ < size_) {
-                                        if (data_[pos_] == '\n') advanceLine();
-                                        adv();
-                                    }
-                                } else if (data_[pos_] == q) {
-                                    adv();
-                                    break;
-                                } else {
-                                    if (data_[pos_] == '\n') advanceLine();
-                                    adv();
-                                }
-                            }
+                            skipQuotedString(c);
                             continue;
                         }
                         // Skip template strings
                         if (c == '`') {
                             adv();
-                            while (pos_ < size_) {
-                                if (data_[pos_] == '\\') {
-                                    adv();
-                                    if (pos_ < size_) {
-                                        if (data_[pos_] == '\n') advanceLine();
-                                        adv();
-                                    }
-                                } else if (data_[pos_] == '`') {
-                                    adv();
-                                    break;
-                                } else if (data_[pos_] == '$' && pos_ + 1 < size_ && data_[pos_ + 1] == '{') {
-                                    int depth = 1;
-                                    adv(); adv();
-                                    while (pos_ < size_ && depth > 0) {
-                                        if (data_[pos_] == '{') ++depth;
-                                        else if (data_[pos_] == '}') { --depth; if (depth == 0) { adv(); break; } }
-                                        if (data_[pos_] == '\'' || data_[pos_] == '"') {
-                                            char q2 = data_[pos_];
-                                            adv();
-                                            while (pos_ < size_ && data_[pos_] != q2) {
-                                                if (data_[pos_] == '\\') { adv(); if (pos_ < size_) adv(); }
-                                                else { if (data_[pos_] == '\n') advanceLine(); adv(); }
-                                            }
-                                            if (pos_ < size_) adv();
-                                            continue;
-                                        }
-                                        if (data_[pos_] == '\n') advanceLine();
-                                        adv();
-                                    }
-                                    continue;
-                                } else {
-                                    if (data_[pos_] == '\n') advanceLine();
-                                    adv();
-                                }
-                            }
+                            skipTemplateString();
                             continue;
                         }
                         // Skip line comments
                         if (c == '/' && pos_ + 1 < size_ && data_[pos_ + 1] == '/') {
-                            while (pos_ < size_ && data_[pos_] != '\n') adv();
+                            skipLineComment();
                             continue;
                         }
                         // Skip block comments
                         if (c == '/' && pos_ + 1 < size_ && data_[pos_ + 1] == '*') {
                             adv(); adv();
-                            while (pos_ < size_) {
-                                if (data_[pos_] == '*' && pos_ + 1 < size_ && data_[pos_ + 1] == '/') {
-                                    adv(); adv();
-                                    break;
-                                }
-                                if (data_[pos_] == '\n') advanceLine();
-                                adv();
-                            }
+                            skipBlockComment();
                             continue;
                         }
                         // Skip regex literals
                         if (c == '/') {
-                            // Could be regex or division. Use simple heuristic:
-                            // if previous non-whitespace is an identifier char or ) or ],
-                            // it's division; otherwise regex.
+                            // Determine if this is a regex or division operator.
+                            // After an identifier that is NOT a regex-enabling keyword
+                            // (return, typeof, delete, void, throw, new, in, instanceof,
+                            // case, yield), or after ) or ], it's division.
                             bool isRegex = true;
                             if (pos_ > 0) {
                                 char prev = data_[pos_ - 1];
-                                if (std::isalnum(static_cast<unsigned char>(prev)) || prev == ')' || prev == ']' || prev == '_') {
-                                    isRegex = false;
+                                if (std::isalnum(static_cast<unsigned char>(prev)) || prev == '_' || prev == ')' || prev == ']') {
+                                    // Check if the preceding identifier is a regex keyword
+                                    std::size_t identEnd = pos_;
+                                    std::size_t identStart = identEnd;
+                                    while (identStart > 0 && (std::isalnum(static_cast<unsigned char>(data_[identStart - 1])) || data_[identStart - 1] == '_')) {
+                                        --identStart;
+                                    }
+                                    if (identStart < identEnd) {
+                                        std::size_t len = identEnd - identStart;
+                                        const char* p = data_ + identStart;
+                                        isRegex = false; // default: identifier -> division
+                                        // Override for regex-enabling keywords
+                                        if ((len == 2 && std::memcmp(p, "in", 2) == 0) ||
+                                            (len == 3 && std::memcmp(p, "new", 3) == 0) ||
+                                            (len == 4 && (std::memcmp(p, "void", 4) == 0 || std::memcmp(p, "case", 4) == 0))) {
+                                            isRegex = true;
+                                        } else if (len == 5 && (std::memcmp(p, "throw", 5) == 0 || std::memcmp(p, "yield", 5) == 0)) {
+                                            isRegex = true;
+                                        } else if (len == 6 && (std::memcmp(p, "return", 6) == 0 || std::memcmp(p, "typeof", 6) == 0 || std::memcmp(p, "delete", 6) == 0)) {
+                                            isRegex = true;
+                                        } else if (len == 10 && std::memcmp(p, "instanceof", 10) == 0) {
+                                            isRegex = true;
+                                        }
+                                    } else {
+                                        // prev is ) or ] — division
+                                        isRegex = false;
+                                    }
                                 }
                             }
                             if (isRegex) {
                                 adv(); // skip /
-                                while (pos_ < size_) {
-                                    if (data_[pos_] == '\\') {
-                                        adv();
-                                        if (pos_ < size_) adv();
-                                    } else if (data_[pos_] == '/') {
-                                        adv();
-                                        break;
-                                    } else if (data_[pos_] == '[') {
-                                        adv();
-                                        while (pos_ < size_ && data_[pos_] != ']') {
-                                            if (data_[pos_] == '\\') { adv(); if (pos_ < size_) adv(); }
-                                            else adv();
-                                        }
-                                        if (pos_ < size_) adv(); // skip ]
-                                    } else {
-                                        if (data_[pos_] == '\n') advanceLine();
-                                        adv();
-                                    }
-                                }
-                                // Skip regex flags
-                                while (pos_ < size_ && std::isalpha(static_cast<unsigned char>(data_[pos_]))) adv();
+                                skipRegexLiteral();
                                 continue;
                             }
                         }
@@ -330,8 +313,6 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                             };
 
                             bool isDirective = false;
-                            const char* directiveName = nullptr;
-                            std::size_t directiveLen = 0;
 
                             // Check each directive
                             struct DirCheck { const char* name; std::size_t len; };
@@ -345,8 +326,6 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                                     (pos_ + d.len >= size_ || !isIdentChar(data_[pos_ + d.len])))
                                 {
                                     isDirective = true;
-                                    directiveName = d.name;
-                                    directiveLen = d.len;
                                     break;
                                 }
                             }
@@ -383,20 +362,12 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                                 //
                                 // Let me just do that. We'll make the tokenizer
                                 // handle strings/comments within CC content.
-                                if (!hadDirective) {
-                                    // First directive after //@cc_on
-                                    // Emit everything from //@cc_on end to here as CCBlock
-                                    // Wait, we already advanced past strings/comments.
-                                    // We can't just emit from ccRestStart to pos_
-                                    // because we've been skipping strings.
-                                    //
-                                    // Actually the right approach: just emit the
-                                    // rest of the source as one CCBlock and break.
-                                    emitSegment(SegmentType::CCBlock, pos_, size_);
-                                    pos_ = size_;
-                                    segmentStart = pos_;
-                                    goto done_scan;
-                                }
+                                // Emit everything from this directive to end as CCBlock.
+                                // The tokenizer will handle extracting directives.
+                                emitSegment(SegmentType::CCBlock, pos_, size_);
+                                pos_ = size_;
+                                segmentStart = pos_;
+                                goto done_scan;
                             }
                         }
 
@@ -414,7 +385,7 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                     goto done_scan;
                 }
                 // Regular line comment — skip to end
-                while (pos_ < size_ && data_[pos_] != '\n') adv();
+                skipLineComment();
                 continue;
             }
 
@@ -465,14 +436,7 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 }
                 // Regular block comment
                 adv(); adv(); // skip /*
-                while (pos_ < size_) {
-                    if (data_[pos_] == '*' && pos_ + 1 < size_ && data_[pos_ + 1] == '/') {
-                        adv(); adv();
-                        break;
-                    }
-                    if (data_[pos_] == '\n') advanceLine();
-                    adv();
-                }
+                skipBlockComment();
                 continue;
             }
 
@@ -480,28 +444,10 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
             if (c == '/' && isRegexPosition()) {
                 lastSignificantChar_ = '/';
                 lastWasOperator_ = false;
-                lastWasKeyword_ = false;
+                lastWasRegexKeyword_ = false;
+                lastIdentifier_.clear();
                 adv(); // skip /
-                while (pos_ < size_) {
-                    if (data_[pos_] == '\\') {
-                        adv();
-                        if (pos_ < size_) adv();
-                    } else if (data_[pos_] == '/') {
-                        adv();
-                        break;
-                    } else if (data_[pos_] == '[') {
-                        adv();
-                        while (pos_ < size_ && data_[pos_] != ']') {
-                            if (data_[pos_] == '\\') { adv(); if (pos_ < size_) adv(); }
-                            else adv();
-                        }
-                        if (pos_ < size_) adv();
-                    } else {
-                        if (data_[pos_] == '\n') advanceLine();
-                        adv();
-                    }
-                }
-                while (pos_ < size_ && std::isalpha(static_cast<unsigned char>(data_[pos_]))) adv();
+                skipRegexLiteral();
                 continue;
             }
 
@@ -512,13 +458,27 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 advanceLine();
                 lastSignificantChar_ = '\n';
                 lastWasOperator_ = false;
-                lastWasKeyword_ = false;
+                lastWasRegexKeyword_ = false;
+                lastIdentifier_.clear();
             } else if (std::isalpha(static_cast<unsigned char>(c)) || c == '_' || c == '$') {
-                lastWasKeyword_ = true;
+                // Accumulate identifier characters
+                lastIdentifier_.push_back(c);
                 lastWasOperator_ = false;
                 lastSignificantChar_ = c;
             } else {
-                lastWasKeyword_ = false;
+                // Non-identifier: check if accumulated identifier is a
+                // JS keyword that enables regex position (return, typeof, etc.)
+                if (!lastIdentifier_.empty()) {
+                    lastWasRegexKeyword_ =
+                        lastIdentifier_ == "return" || lastIdentifier_ == "typeof" ||
+                        lastIdentifier_ == "delete" || lastIdentifier_ == "void" ||
+                        lastIdentifier_ == "throw" || lastIdentifier_ == "new" ||
+                        lastIdentifier_ == "in" || lastIdentifier_ == "instanceof" ||
+                        lastIdentifier_ == "case" || lastIdentifier_ == "yield";
+                    lastIdentifier_.clear();
+                } else {
+                    lastWasRegexKeyword_ = false;
+                }
                 switch (c) {
                     case '+': case '-': case '*': case '%':
                     case '<': case '>': case '=': case '!':
@@ -540,63 +500,13 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
         // ── CC Block (inside /*@cc_on ... @*/) ───────────────────────────
         case State::CCBlock: {
             if (c == '\'' || c == '"') {
-                char q = c;
                 adv();
-                while (pos_ < size_) {
-                    if (data_[pos_] == '\\') {
-                        adv();
-                        if (pos_ < size_) {
-                            if (data_[pos_] == '\n') advanceLine();
-                            adv();
-                        }
-                    } else if (data_[pos_] == q) {
-                        adv();
-                        break;
-                    } else {
-                        if (data_[pos_] == '\n') advanceLine();
-                        adv();
-                    }
-                }
+                skipQuotedString(c);
                 continue;
             }
             if (c == '`') {
                 adv();
-                while (pos_ < size_) {
-                    if (data_[pos_] == '\\') {
-                        adv();
-                        if (pos_ < size_) {
-                            if (data_[pos_] == '\n') advanceLine();
-                            adv();
-                        }
-                    } else if (data_[pos_] == '`') {
-                        adv();
-                        break;
-                    } else if (data_[pos_] == '$' && pos_ + 1 < size_ && data_[pos_ + 1] == '{') {
-                        int depth = 1;
-                        adv(); adv();
-                        while (pos_ < size_ && depth > 0) {
-                            if (data_[pos_] == '{') ++depth;
-                            else if (data_[pos_] == '}') { --depth; if (depth == 0) { adv(); break; } }
-                            // Handle strings inside template expression
-                            if (data_[pos_] == '\'' || data_[pos_] == '"') {
-                                char q = data_[pos_];
-                                adv();
-                                while (pos_ < size_ && data_[pos_] != q) {
-                                    if (data_[pos_] == '\\') { adv(); if (pos_ < size_) adv(); }
-                                    else { if (data_[pos_] == '\n') advanceLine(); adv(); }
-                                }
-                                if (pos_ < size_) adv();
-                                continue;
-                            }
-                            if (data_[pos_] == '\n') advanceLine();
-                            adv();
-                        }
-                        continue;
-                    } else {
-                        if (data_[pos_] == '\n') advanceLine();
-                        adv();
-                    }
-                }
+                skipTemplateString();
                 continue;
             }
             // Closing @*/
@@ -672,7 +582,7 @@ done_scan:
         emitSegment(SegmentType::NormalJS, segmentStart, size_);
     }
 
-    return true;
+    return !errors_ || errors_->size() == errorCount;
 }
 
 } // namespace jscriptcc

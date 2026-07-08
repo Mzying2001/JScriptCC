@@ -47,12 +47,19 @@ private:
 
     // Helpers
     char peek(std::size_t offset = 0) const;
-    char peekNext(std::size_t offset = 0) const;
-    bool matchAhead(const char* s, std::size_t offset = 0) const;
+    void adv();
     bool isRegexPosition() const;
     void emitSegment(SegmentType type, std::size_t begin, std::size_t end);
     void addError(int line, int col, const std::string& msg);
     void advanceLine();
+
+    // Skip helpers (called after the opening character is consumed)
+    void skipQuotedString(char quote);   // ' or " — advances past closing quote
+    void skipTemplateString();           // ` — advances past closing `, handles ${...}
+    void skipTemplateExpression();       // { — advances past matching }
+    void skipLineComment();              // advances past newline
+    void skipBlockComment();             // advances past */
+    void skipRegexLiteral();             // advances past /regex/flags
 
     // State
     const char* data_ = nullptr;
@@ -64,13 +71,11 @@ private:
     // Track last non-whitespace, non-comment token for regex detection
     char lastSignificantChar_ = 0;
     bool lastWasOperator_ = false;
-    bool lastWasKeyword_ = false;
+    bool lastWasRegexKeyword_ = false;  // true after JS keywords that enable regex (return, typeof, etc.)
+    std::string lastIdentifier_;  // accumulates current identifier text
 
     std::vector<SourceSegment> segments_;
     CCErrorList* errors_ = nullptr;
-
-    // Template expression brace depth
-    int templateBraceDepth_ = 0;
 };
 
 } // namespace jscriptcc

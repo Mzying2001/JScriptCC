@@ -10,11 +10,11 @@ namespace jscriptcc {
 /// Follows JScript's type coercion rules for conditional compilation.
 class CCValue {
 public:
-    enum Type { TYPE_NUMBER, TYPE_STRING, TYPE_BOOL, TYPE_UNDEFINED };
+    enum class Type { Number, String, Bool, Undefined };
 
-    CCValue() : type_(TYPE_UNDEFINED), num_(0), bool_(false) {}
-    CCValue(double n) : type_(TYPE_NUMBER), num_(n), bool_(n != 0) {}
-    CCValue(const std::string& s) : type_(TYPE_STRING), num_(0), bool_(false), str_(s) {
+    CCValue() : type_(Type::Undefined), num_(0), bool_(false) {}
+    CCValue(double n) : type_(Type::Number), num_(n), bool_(n != 0) {}
+    CCValue(const std::string& s) : type_(Type::String), num_(0), bool_(false), str_(s) {
         // Try to convert to number if it looks numeric
         if (!s.empty()) {
             char* end = nullptr;
@@ -24,39 +24,39 @@ public:
             }
         }
     }
-    CCValue(bool b) : type_(TYPE_BOOL), num_(b ? 1 : 0), bool_(b) {}
+    CCValue(bool b) : type_(Type::Bool), num_(b ? 1 : 0), bool_(b) {}
 
     Type type() const { return type_; }
-    bool isUndefined() const { return type_ == TYPE_UNDEFINED; }
-    bool isNumber() const { return type_ == TYPE_NUMBER; }
-    bool isString() const { return type_ == TYPE_STRING; }
-    bool isBool() const { return type_ == TYPE_BOOL; }
+    bool isUndefined() const { return type_ == Type::Undefined; }
+    bool isNumber() const { return type_ == Type::Number; }
+    bool isString() const { return type_ == Type::String; }
+    bool isBool() const { return type_ == Type::Bool; }
 
     double toNumber() const {
         switch (type_) {
-            case TYPE_NUMBER: return num_;
-            case TYPE_BOOL: return bool_ ? 1.0 : 0.0;
-            case TYPE_STRING: return num_; // pre-computed in constructor
-            case TYPE_UNDEFINED: return std::numeric_limits<double>::quiet_NaN();
+            case Type::Number: return num_;
+            case Type::Bool: return bool_ ? 1.0 : 0.0;
+            case Type::String: return num_; // pre-computed in constructor
+            case Type::Undefined: return std::numeric_limits<double>::quiet_NaN();
         }
         return 0;
     }
 
     bool toBool() const {
         switch (type_) {
-            case TYPE_BOOL: return bool_;
-            case TYPE_NUMBER: return num_ != 0 && !std::isnan(num_);
-            case TYPE_STRING: return !str_.empty();
-            case TYPE_UNDEFINED: return false;
+            case Type::Bool: return bool_;
+            case Type::Number: return num_ != 0 && !std::isnan(num_);
+            case Type::String: return !str_.empty();
+            case Type::Undefined: return false;
         }
         return false;
     }
 
     std::string toString() const {
         switch (type_) {
-            case TYPE_STRING: return str_;
-            case TYPE_BOOL: return bool_ ? "true" : "false";
-            case TYPE_NUMBER: {
+            case Type::String: return str_;
+            case Type::Bool: return bool_ ? "true" : "false";
+            case Type::Number: {
                 // Safely check if the number is an integer without UB.
                 // static_cast<int> is undefined when the value is out of int range,
                 // so we range-check first using doubles (which can represent INT_MIN/INT_MAX).
@@ -70,7 +70,7 @@ public:
                 }
                 return std::to_string(num_);
             }
-            case TYPE_UNDEFINED: return "undefined";
+            case Type::Undefined: return "undefined";
         }
         return "";
     }

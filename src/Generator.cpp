@@ -17,6 +17,8 @@ bool Generator::generate(
     output.clear();
     output.reserve(sourceSize); // reasonable estimate
 
+    std::size_t errorCount = errors_ ? errors_->size() : 0;
+
     for (const auto& seg : segments) {
         switch (seg.type) {
             case SegmentType::NormalJS: {
@@ -44,7 +46,8 @@ bool Generator::generate(
         }
     }
 
-    return true;
+    // Return false if any errors were added during processing
+    return !errors_ || errors_->size() == errorCount;
 }
 
 void Generator::processCCBlock(

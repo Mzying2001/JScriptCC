@@ -6,6 +6,19 @@
 
 namespace jscriptcc {
 
+// Safe double-to-int32 conversion matching JScript's ToInt32 semantics.
+// Returns 0 for NaN, Infinity, or values outside int range.
+static int safeToInt32(double v) {
+    if (std::isnan(v) || std::isinf(v) || v == 0.0) return 0;
+    // Use fmod to match ToInt32: n modulo 2^32, then reinterpret as signed
+    double two32 = 4294967296.0; // 2^32
+    double n = std::fmod(v, two32);
+    if (n < 0) n += two32;
+    // Now n is in [0, 2^32). Convert to int32 via two's complement.
+    if (n >= 2147483648.0) return static_cast<int>(n - two32);
+    return static_cast<int>(n);
+}
+
 // ── Main evaluate ────────────────────────────────────────────────────────────
 
 EvalResult Evaluator::evaluate(const BlockNode& block, CCEnvironment& env, CCErrorList* errors) {
@@ -121,7 +134,7 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
 
         case ExprType::UnaryBitNot: {
             double v = evalExpr(*node.left).toNumber();
-            return CCValue(static_cast<double>(~static_cast<int>(v)));
+            return CCValue(static_cast<double>(~safeToInt32(v)));
         }
 
         case ExprType::UnaryPlus:
@@ -165,14 +178,14 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
             return CCValue(evalExpr(*node.left).toNumber() - evalExpr(*node.right).toNumber());
 
         case ExprType::Shl: {
-            int l = static_cast<int>(evalExpr(*node.left).toNumber());
-            int r = static_cast<int>(evalExpr(*node.right).toNumber()) & 0x1f;
+            int l = safeToInt32(evalExpr(*node.left).toNumber());
+            int r = safeToInt32(evalExpr(*node.right).toNumber()) & 0x1f;
             return CCValue(static_cast<double>(l << r));
         }
 
         case ExprType::Shr: {
-            int l = static_cast<int>(evalExpr(*node.left).toNumber());
-            int r = static_cast<int>(evalExpr(*node.right).toNumber()) & 0x1f;
+            int l = safeToInt32(evalExpr(*node.left).toNumber());
+            int r = safeToInt32(evalExpr(*node.right).toNumber()) & 0x1f;
             return CCValue(static_cast<double>(l >> r));
         }
 
@@ -208,18 +221,18 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
 
         case ExprType::BitAnd:
             return CCValue(static_cast<double>(
-                static_cast<int>(evalExpr(*node.left).toNumber()) &
-                static_cast<int>(evalExpr(*node.right).toNumber())));
+                safeToInt32(evalExpr(*node.left).toNumber()) &
+                safeToInt32(evalExpr(*node.right).toNumber())));
 
         case ExprType::BitXor:
             return CCValue(static_cast<double>(
-                static_cast<int>(evalExpr(*node.left).toNumber()) ^
-                static_cast<int>(evalExpr(*node.right).toNumber())));
+                safeToInt32(evalExpr(*node.left).toNumber()) ^
+                safeToInt32(evalExpr(*node.right).toNumber())));
 
         case ExprType::BitOr:
             return CCValue(static_cast<double>(
-                static_cast<int>(evalExpr(*node.left).toNumber()) |
-                static_cast<int>(evalExpr(*node.right).toNumber())));
+                safeToInt32(evalExpr(*node.left).toNumber()) |
+                safeToInt32(evalExpr(*node.right).toNumber())));
 
         case ExprType::LogAnd: {
             CCValue l = evalExpr(*node.left);

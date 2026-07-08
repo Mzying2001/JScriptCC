@@ -1,6 +1,7 @@
 #include "jscriptcc/Parser.h"
 #include <cstring>
 #include <cstdlib>
+#include <new> // std::bad_alloc
 
 namespace jscriptcc {
 
@@ -66,6 +67,8 @@ std::unique_ptr<BlockNode> Parser::parse(const std::vector<Token>& tokens, CCErr
 
     auto block = std::unique_ptr<BlockNode>(new BlockNode());
 
+    if (tokens.empty()) return block;
+
     while (!atEnd()) {
         // Skip leading newlines
         if (check(TokenType::NEWLINE)) {
@@ -78,6 +81,8 @@ std::unique_ptr<BlockNode> Parser::parse(const std::vector<Token>& tokens, CCErr
             if (stmt) {
                 block->statements.push_back(std::move(stmt));
             }
+        } catch (std::bad_alloc&) {
+            throw; // Don't swallow memory exhaustion
         } catch (...) {
             synchronize();
         }
