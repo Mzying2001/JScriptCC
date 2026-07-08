@@ -1,0 +1,147 @@
+#include "jscriptcc/Generator.h"
+#include "jscriptcc/Tokenizer.h"
+#include "jscriptcc/Parser.h"
+#include "jscriptcc/Evaluator.h"
+
+namespace jscriptcc {
+
+bool Generator::generate(
+    const char* sourceData,
+    std::size_t sourceSize,
+    const std::vector<SourceSegment>& segments,
+    CCEnvironment& env,
+    std::string& output,
+    CCErrorList* errors)
+{
+    errors_ = errors;
+    output.clear();
+    output.reserve(sourceSize); // reasonable estimate
+
+    for (const auto& seg : segments) {
+        switch (seg.type) {
+            case SegmentType::NormalJS: {
+                // Copy normal JS verbatim
+                output.append(sourceData + seg.begin, seg.end - seg.begin);
+                break;
+            }
+
+            case SegmentType::CCBlock: {
+                // Process /*@cc_on ... @*/
+                processCCBlock(sourceData, seg.begin, seg.end, env, output);
+                break;
+            }
+
+            case SegmentType::CCOnLine: {
+                // //@cc_on line — output as a comment (it's a line comment)
+                // Actually, in the output we should just remove the //@cc_on line
+                // since it's a CC directive. But we could also preserve it as a
+                // comment. Let's remove it (the user wants clean JS output).
+                // But wait — the @cc_on line itself should not appear in output.
+                // The subsequent CC block was already processed.
+                // So we just skip this segment.
+                break;
+            }
+        }
+    }
+
+    return true;
+}
+
+void Generator::processCCBlock(
+    const char* blockData,
+    std::size_t blockBegin,
+    std::size_t blockEnd,
+    CCEnvironment& env,
+    std::string& output)
+{
+    // The block includes /*@cc_on ... @*/
+    // We need to extract the content between /*@cc_on and @*/
+    // But the content may have already been identified by the scanner.
+
+    // Find the actual CC content: skip /*@cc_on and the newline after it,
+    // stop before @*/
+    std::size_t contentBegin = blockBegin;
+    std::size_t contentEnd = blockEnd;
+
+    // Skip /*@cc_on and the newline after it
+    if (contentBegin + 2 < blockEnd &&
+        blockData[contentBegin] == '/' && blockData[contentBegin + 1] == '*') {
+        contentBegin += 2; // skip /*
+        const char* p = blockData + contentBegin;
+        const char* end = blockData + contentEnd;
+        // Skip whitespace before @cc_on
+        while (p < end && (*p == ' ' || *p == '\t')) ++p;
+        // Skip @cc_on
+        if (p + 6 <= end && std::memcmp(p, "@cc_on", 6) == 0) {
+            p += 6;
+        }
+        // Skip whitespace and newline after @cc_on
+        while (p < end && (*p == ' ' || *p == '\t' || *p == '\r')) ++p;
+        if (p < end && *p == '\n') ++p;
+        contentBegin = static_cast<std::size_t>(p - blockData);
+    }
+
+    // Find @*/ at the end
+    if (contentEnd >= 3 &&
+        blockData[contentEnd - 3] == '@' &&
+        blockData[contentEnd - 2] == '*' &&
+        blockData[contentEnd - 1] == '/') {
+        contentEnd -= 3;
+    }
+
+    // Trim trailing whitespace/newline before @*/
+    while (contentEnd > contentBegin &&
+           (blockData[contentEnd - 1] == ' ' || blockData[contentEnd - 1] == '\t' ||
+            blockData[contentEnd - 1] == '\r')) {
+        --contentEnd;
+    }
+    if (contentEnd > contentBegin && blockData[contentEnd - 1] == '\n') {
+        --contentEnd;
+    }
+
+    if (contentBegin >= contentEnd) return; // empty CC block
+
+    // Tokenize the CC content
+    std::size_t contentSize = contentEnd - contentBegin;
+    const char* contentData = blockData + contentBegin;
+
+    Tokenizer tokenizer;
+    tokenizer.tokenize(contentData, contentSize, errors_);
+
+    // Parse
+    Parser parser;
+    auto ast = parser.parse(tokenizer.tokens(), errors_);
+
+    // Evaluate
+    Evaluator evaluator;
+    EvalResult result = evaluator.evaluate(*ast, env, errors_);
+
+    // Append evaluated output
+    if (result.hasOutput) {
+        output.append(result.outputText);
+    }
+}
+
+void Generator::processCCOnLine(
+    const char* sourceData,
+    std::size_t lineBegin,
+    std::size_t lineEnd,
+    std::size_t sourceSize,
+    CCEnvironment& env,
+    std::string& output,
+    CCErrorList* errors)
+{
+    // This handles the //@cc_on line and everything after it.
+    // The scanner already identified the CCOnLine segment and the subsequent
+    // CCBlock segment. So this method is not called directly for the rest.
+    // The //@cc_on line itself is skipped (not output).
+    (void)sourceData;
+    (void)lineBegin;
+    (void)lineEnd;
+    (void)sourceSize;
+    (void)env;
+    (void)output;
+    (void)errors;
+}
+
+} // namespace jscriptcc
