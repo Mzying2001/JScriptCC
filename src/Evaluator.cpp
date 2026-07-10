@@ -7,6 +7,98 @@
 
 namespace jscriptcc {
 
+static int hexValue(char c) {
+    if (c >= '0' && c <= '9') return c - '0';
+    if (c >= 'a' && c <= 'f') return c - 'a' + 10;
+    if (c >= 'A' && c <= 'F') return c - 'A' + 10;
+    return -1;
+}
+
+static void appendUtf8(std::string& output, unsigned int codePoint) {
+    if (codePoint <= 0x7f) {
+        output.push_back(static_cast<char>(codePoint));
+    } else if (codePoint <= 0x7ff) {
+        output.push_back(static_cast<char>(0xc0 | (codePoint >> 6)));
+        output.push_back(static_cast<char>(0x80 | (codePoint & 0x3f)));
+    } else {
+        output.push_back(static_cast<char>(0xe0 | (codePoint >> 12)));
+        output.push_back(static_cast<char>(0x80 | ((codePoint >> 6) & 0x3f)));
+        output.push_back(static_cast<char>(0x80 | (codePoint & 0x3f)));
+    }
+}
+
+static std::string decodeStringLiteral(const StringSlice& text) {
+    std::string raw = text.toString();
+    if (raw.size() < 2 || (raw.front() != '\'' && raw.front() != '"') || raw.back() != raw.front()) {
+        return raw;
+    }
+
+    std::string result;
+    for (std::size_t i = 1; i + 1 < raw.size(); ++i) {
+        char c = raw[i];
+        if (c != '\\' || i + 1 >= raw.size() - 1) {
+            result.push_back(c);
+            continue;
+        }
+
+        char escaped = raw[++i];
+        switch (escaped) {
+            case 'b': result.push_back('\b'); break;
+            case 'f': result.push_back('\f'); break;
+            case 'n': result.push_back('\n'); break;
+            case 'r': result.push_back('\r'); break;
+            case 't': result.push_back('\t'); break;
+            case 'v': result.push_back('\v'); break;
+            case '0': result.push_back('\0'); break;
+            case '\\': result.push_back('\\'); break;
+            case '\'': result.push_back('\''); break;
+            case '"': result.push_back('"'); break;
+            case '\n': break;
+            case '\r':
+                if (i + 1 < raw.size() - 1 && raw[i + 1] == '\n') ++i;
+                break;
+            case 'x': {
+                if (i + 2 < raw.size() - 1) {
+                    int high = hexValue(raw[i + 1]);
+                    int low = hexValue(raw[i + 2]);
+                    if (high >= 0 && low >= 0) {
+                        result.push_back(static_cast<char>((high << 4) | low));
+                        i += 2;
+                        break;
+                    }
+                }
+                result.push_back('x');
+                break;
+            }
+            case 'u': {
+                if (i + 4 < raw.size() - 1) {
+                    unsigned int codePoint = 0;
+                    bool valid = true;
+                    for (int digit = 1; digit <= 4; ++digit) {
+                        int value = hexValue(raw[i + digit]);
+                        if (value < 0) {
+                            valid = false;
+                            break;
+                        }
+                        codePoint = (codePoint << 4) | static_cast<unsigned int>(value);
+                    }
+                    if (valid) {
+                        appendUtf8(result, codePoint);
+                        i += 4;
+                        break;
+                    }
+                }
+                result.push_back('u');
+                break;
+            }
+            default:
+                result.push_back(escaped);
+                break;
+        }
+    }
+    return result;
+}
+
 // Safe double-to-int32 conversion matching JScript's ToInt32 semantics.
 // Returns 0 for NaN, Infinity, or values outside int range.
 static std::int32_t safeToInt32(double v) {
@@ -118,12 +210,7 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
         }
 
         case ExprType::StringLiteral: {
-            // Remove quotes
-            std::string s = node.valueText.toString();
-            if (s.size() >= 2 && (s.front() == '\'' || s.front() == '"') && s.front() == s.back()) {
-                s = s.substr(1, s.size() - 2);
-            }
-            return CCValue(s);
+            return CCValue(decodeStringLiteral(node.valueText));
         }
 
         case ExprType::Identifier: {
@@ -203,23 +290,47 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
             return CCValue(static_cast<double>(bitsToInt32(shifted)));
         }
 
-        case ExprType::Lt:
-            return CCValue(evalExpr(*node.left).toNumber() < evalExpr(*node.right).toNumber());
+        case ExprType::Lt: {
+            CCValue left = evalExpr(*node.left);
+            CCValue right = evalExpr(*node.right);
+            if (left.isString() && right.isString()) return CCValue(left.str() < right.str());
+            return CCValue(left.toNumber() < right.toNumber());
+        }
 
-        case ExprType::Le:
-            return CCValue(evalExpr(*node.left).toNumber() <= evalExpr(*node.right).toNumber());
+        case ExprType::Le: {
+            CCValue left = evalExpr(*node.left);
+            CCValue right = evalExpr(*node.right);
+            if (left.isString() && right.isString()) return CCValue(left.str() <= right.str());
+            return CCValue(left.toNumber() <= right.toNumber());
+        }
 
-        case ExprType::Gt:
-            return CCValue(evalExpr(*node.left).toNumber() > evalExpr(*node.right).toNumber());
+        case ExprType::Gt: {
+            CCValue left = evalExpr(*node.left);
+            CCValue right = evalExpr(*node.right);
+            if (left.isString() && right.isString()) return CCValue(left.str() > right.str());
+            return CCValue(left.toNumber() > right.toNumber());
+        }
 
-        case ExprType::Ge:
-            return CCValue(evalExpr(*node.left).toNumber() >= evalExpr(*node.right).toNumber());
+        case ExprType::Ge: {
+            CCValue left = evalExpr(*node.left);
+            CCValue right = evalExpr(*node.right);
+            if (left.isString() && right.isString()) return CCValue(left.str() >= right.str());
+            return CCValue(left.toNumber() >= right.toNumber());
+        }
 
         case ExprType::Eq: {
             CCValue l = evalExpr(*node.left);
             CCValue r = evalExpr(*node.right);
-            if (l.isString() || r.isString()) {
-                return CCValue(l.toString() == r.toString());
+            if (l.type() == r.type()) {
+                if (l.isString()) return CCValue(l.str() == r.str());
+                if (l.isBool()) return CCValue(l.toBool() == r.toBool());
+                if (l.isUndefined()) return CCValue(true);
+                return CCValue(l.toNumber() == r.toNumber());
+            }
+            if (l.isBool()) l = CCValue(l.toNumber());
+            if (r.isBool()) r = CCValue(r.toNumber());
+            if ((l.isString() && r.isNumber()) || (l.isNumber() && r.isString())) {
+                return CCValue(l.toNumber() == r.toNumber());
             }
             return CCValue(l.toNumber() == r.toNumber());
         }
@@ -227,9 +338,14 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
         case ExprType::Ne: {
             CCValue l = evalExpr(*node.left);
             CCValue r = evalExpr(*node.right);
-            if (l.isString() || r.isString()) {
-                return CCValue(l.toString() != r.toString());
+            if (l.type() == r.type()) {
+                if (l.isString()) return CCValue(l.str() != r.str());
+                if (l.isBool()) return CCValue(l.toBool() != r.toBool());
+                if (l.isUndefined()) return CCValue(false);
+                return CCValue(l.toNumber() != r.toNumber());
             }
+            if (l.isBool()) l = CCValue(l.toNumber());
+            if (r.isBool()) r = CCValue(r.toNumber());
             return CCValue(l.toNumber() != r.toNumber());
         }
 

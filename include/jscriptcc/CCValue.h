@@ -14,15 +14,19 @@ public:
 
     CCValue() : type_(Type::Undefined), num_(0), bool_(false) {}
     CCValue(double n) : type_(Type::Number), num_(n), bool_(n != 0) {}
-    CCValue(const std::string& s) : type_(Type::String), num_(0), bool_(false), str_(s) {
-        // Try to convert to number if it looks numeric
-        if (!s.empty()) {
-            char* end = nullptr;
-            double d = std::strtod(s.c_str(), &end);
-            if (end != s.c_str() && *end == '\0') {
-                num_ = d;
-            }
+    CCValue(const std::string& s)
+        : type_(Type::String), num_(std::numeric_limits<double>::quiet_NaN()), bool_(false), str_(s) {
+        const char* begin = s.c_str();
+        while (*begin != '\0' && std::isspace(static_cast<unsigned char>(*begin))) ++begin;
+        if (*begin == '\0') {
+            num_ = 0.0;
+            return;
         }
+
+        char* end = nullptr;
+        double d = std::strtod(begin, &end);
+        while (end && *end != '\0' && std::isspace(static_cast<unsigned char>(*end))) ++end;
+        if (end != begin && end && *end == '\0') num_ = d;
     }
     CCValue(bool b) : type_(Type::Bool), num_(b ? 1 : 0), bool_(b) {}
 

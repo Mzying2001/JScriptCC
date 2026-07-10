@@ -756,6 +756,39 @@ TEST(string_comparison) {
     ASSERT_FALSE(out.find("console.log('dev');") != std::string::npos);
 }
 
+TEST(string_literals_decode_escapes) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if('\\x41' == 'A' && '\\u0042' == 'B' && 'a\\n' != 'an')\n"
+        "alert('decoded');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('decoded');") != std::string::npos);
+}
+
+TEST(string_relational_comparison_is_lexical) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if('b' > 'a' && '10' < '2')\n"
+        "alert('lexical');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('lexical');") != std::string::npos);
+}
+
+TEST(string_number_equality_uses_numeric_coercion) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if('01' == 1 && ' 2 ' == 2 && 'abc' != 0)\n"
+        "alert('coerced');\n"
+        "@end\n"
+        "@*/\n";
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('coerced');") != std::string::npos);
+}
+
 // ── Test: @set without @if ───────────────────────────────────────────────────
 
 TEST(set_without_if) {
