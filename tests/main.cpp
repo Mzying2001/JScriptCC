@@ -88,6 +88,26 @@ TEST(normal_js_with_strings) {
     ASSERT_EQ(process(src), src);
 }
 
+TEST(null_empty_input_is_allowed) {
+    jscriptcc::CCPreprocessor pp;
+    std::string output = "old";
+    std::vector<jscriptcc::CCError> errors;
+    bool ok = pp.Process(nullptr, 0, output, jscriptcc::CCEnvironment(), &errors);
+    ASSERT_TRUE(ok);
+    ASSERT_TRUE(output.empty());
+    ASSERT_TRUE(errors.empty());
+}
+
+TEST(null_nonempty_input_returns_error) {
+    jscriptcc::CCPreprocessor pp;
+    std::string output = "old";
+    std::vector<jscriptcc::CCError> errors;
+    bool ok = pp.Process(nullptr, 1, output, jscriptcc::CCEnvironment(), &errors);
+    ASSERT_FALSE(ok);
+    ASSERT_TRUE(output.empty());
+    ASSERT_EQ(errors.size(), static_cast<std::size_t>(1));
+}
+
 // ── Test: CC block with @if ──────────────────────────────────────────────────
 
 TEST(cc_if_win32_true) {

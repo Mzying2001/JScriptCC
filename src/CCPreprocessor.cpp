@@ -23,6 +23,13 @@ bool CCPreprocessor::Process(
     CCErrorList localErrors;
     CCErrorList* errPtr = errors ? errors : &localErrors;
 
+    if (data == nullptr) {
+        output.clear();
+        if (size == 0) return true;
+        errPtr->push_back(CCError(1, 1, "Input data is null with non-zero size"));
+        return false;
+    }
+
     // Step 1: Scan source to identify CC blocks
     Scanner scanner;
     if (!scanner.scan(data, size, errPtr)) {
