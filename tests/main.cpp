@@ -381,6 +381,24 @@ TEST(template_expression_with_cc) {
     ASSERT_EQ(process(src), src);
 }
 
+TEST(template_expression_regex_brace_does_not_expose_cc) {
+    std::string src =
+        "const x = `${/}/.test('x') ? `/*@if(0) BAD @end @*/` : 'ok'}`;\n";
+    ASSERT_EQ(process(src), src);
+}
+
+TEST(template_expression_comment_brace_does_not_expose_cc) {
+    std::string src =
+        "const x = `${1 /* } */ ? `/*@if(0) BAD @end @*/` : 'ok'}`;\n";
+    ASSERT_EQ(process(src), src);
+}
+
+TEST(template_expression_string_brace_does_not_expose_cc) {
+    std::string src =
+        "const x = `${'}' + `nested ${\"}\"} /*@if(0) BAD @end @*/`}`;\n";
+    ASSERT_EQ(process(src), src);
+}
+
 // ── Test: Regex containing @ directives (should NOT trigger CC) ──────────────
 
 TEST(regex_with_cc) {

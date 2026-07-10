@@ -56,18 +56,77 @@ void Scanner::skipTemplateExpression() {
     // Called after the opening '{' of ${...} is consumed.
     // Advances past the matching '}'.
     int depth = 1;
+    bool regexAllowed = true;
     while (pos_ < size_ && depth > 0) {
-        if (data_[pos_] == '{') {
+        char c = data_[pos_];
+        if (c == '\'' || c == '"') {
+            adv();
+            skipQuotedString(c);
+            regexAllowed = false;
+        } else if (c == '`') {
+            adv();
+            skipTemplateString();
+            regexAllowed = false;
+        } else if (c == '/' && peek(1) == '/') {
+            adv();
+            adv();
+            skipLineComment();
+        } else if (c == '/' && peek(1) == '*') {
+            adv();
+            adv();
+            skipBlockComment();
+        } else if (c == '/' && regexAllowed) {
+            adv();
+            skipRegexLiteral();
+            regexAllowed = false;
+        } else if (c == '/') {
+            adv();
+            regexAllowed = true;
+        } else if (c == '{') {
             ++depth;
             adv();
-        } else if (data_[pos_] == '}') {
+            regexAllowed = true;
+        } else if (c == '}') {
             --depth;
             if (depth == 0) { adv(); return; }
             adv();
-        } else if (data_[pos_] == '\'' || data_[pos_] == '"') {
-            skipQuotedString(data_[pos_]);
+            regexAllowed = false;
+        } else if (std::isalpha(static_cast<unsigned char>(c)) || c == '_' || c == '$') {
+            std::size_t start = pos_;
+            do {
+                adv();
+            } while (pos_ < size_ &&
+                     (std::isalnum(static_cast<unsigned char>(data_[pos_])) ||
+                      data_[pos_] == '_' || data_[pos_] == '$'));
+            StringSlice word(data_ + start, data_ + pos_);
+            regexAllowed = word == "return" || word == "throw" || word == "case" ||
+                           word == "delete" || word == "void" || word == "typeof" ||
+                           word == "new" || word == "in" || word == "instanceof" ||
+                           word == "yield";
+        } else if (std::isdigit(static_cast<unsigned char>(c))) {
+            do {
+                adv();
+            } while (pos_ < size_ &&
+                     (std::isalnum(static_cast<unsigned char>(data_[pos_])) ||
+                      data_[pos_] == '.' || data_[pos_] == '_'));
+            regexAllowed = false;
         } else {
-            if (data_[pos_] == '\n') advanceLine();
+            if (c == '\n') {
+                advanceLine();
+            } else if (c != ' ' && c != '\t' && c != '\r') {
+                switch (c) {
+                    case ')': case ']':
+                        regexAllowed = false;
+                        break;
+                    case '(': case '[': case ',': case ';': case ':':
+                    case '=': case '!': case '&': case '|': case '^': case '~':
+                    case '+': case '-': case '*': case '%': case '?': case '<': case '>':
+                        regexAllowed = true;
+                        break;
+                    default:
+                        break;
+                }
+            }
             adv();
         }
     }
