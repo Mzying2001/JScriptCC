@@ -26,8 +26,6 @@ TEST(cc_set_expression) {
     ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
 }
 
-// ── Test: Expression operators ───────────────────────────────────────────────
-
 TEST(predefined_jscript) {
     std::string src =
         "/*@cc_on\n"
@@ -72,8 +70,6 @@ TEST(predefined_jscript_version) {
     ASSERT_TRUE(out.find("alert('version');") != std::string::npos);
 }
 
-// ── Test: User can override predefined variables ─────────────────────────────
-
 TEST(override_predefined) {
     std::string src =
         "/*@cc_on\n"
@@ -91,8 +87,6 @@ TEST(override_predefined) {
     ASSERT_FALSE(out.find("alert('win32');") != std::string::npos);
 }
 
-// ── Test: Whitespace preservation ────────────────────────────────────────────
-
 TEST(set_without_if) {
     std::string src =
         "/*@cc_on\n"
@@ -104,8 +98,6 @@ TEST(set_without_if) {
     // @set alone doesn't produce output
     ASSERT_TRUE(out.find("bar();") != std::string::npos);
 }
-
-// ── Test: Undefined variable ─────────────────────────────────────────────────
 
 TEST(no_cc_on_set) {
     std::string src =

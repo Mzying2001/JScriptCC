@@ -86,8 +86,6 @@ TEST(expr_arithmetic) {
     ASSERT_TRUE(out.find("alert('mod');") != std::string::npos);
 }
 
-// ── Test: Empty CC block ─────────────────────────────────────────────────────
-
 TEST(string_comparison) {
     std::string src =
         "/*@cc_on\n"
@@ -137,8 +135,6 @@ TEST(string_number_equality_uses_numeric_coercion) {
     ASSERT_TRUE(out.find("alert('coerced');") != std::string::npos);
 }
 
-// ── Test: @set without @if ───────────────────────────────────────────────────
-
 TEST(undefined_variable_is_false_but_not_zero) {
     std::string src =
         "/*@cc_on\n"
@@ -150,8 +146,6 @@ TEST(undefined_variable_is_false_but_not_zero) {
     std::string out = process(src);
     ASSERT_TRUE(out.find("alert('undefined');") != std::string::npos);
 }
-
-// ── Test: Negative numbers ───────────────────────────────────────────────────
 
 TEST(negative_number) {
     std::string src =
@@ -166,8 +160,6 @@ TEST(negative_number) {
     ASSERT_TRUE(out.find("alert('negative');") != std::string::npos);
 }
 
-// ── Test: Hex numbers ────────────────────────────────────────────────────────
-
 TEST(hex_number) {
     std::string src =
         "/*@cc_on\n"
@@ -180,8 +172,6 @@ TEST(hex_number) {
     std::string out = process(src);
     ASSERT_TRUE(out.find("alert('hex');") != std::string::npos);
 }
-
-// ── Test: Shift operators ────────────────────────────────────────────────────
 
 TEST(shift_operators) {
     std::string src =
@@ -210,8 +200,6 @@ TEST(shift_operators_use_int32_bit_patterns) {
     std::string out = process(src);
     ASSERT_TRUE(out.find("alert('int32');") != std::string::npos);
 }
-
-// ── Test: Adjacent CC blocks ─────────────────────────────────────────────────
 
 TEST(expr_division) {
     // 10 / 3 == 3 is false (integer division doesn't exist in JS), use 9/3
@@ -264,8 +252,6 @@ TEST(expr_modulo_by_zero) {
     ASSERT_TRUE(out.find("alert('nan');") != std::string::npos);
 }
 
-// ── Test: Bitwise operations with edge cases ───────────────────────────────
-
 TEST(expr_bitnot) {
     std::string src =
         "/*@cc_on\n"
@@ -311,8 +297,6 @@ TEST(expr_bitwise_xor) {
     std::string out = process(src);
     ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
 }
-
-// ── Test: Comparison operators ─────────────────────────────────────────────
 
 TEST(expr_lt) {
     std::string src =

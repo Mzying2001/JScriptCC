@@ -58,8 +58,6 @@ TEST(real_world_scenario) {
     // Note: @if and @cc_on appear inside string/regex literals, which is correct
 }
 
-// ── Test: @if with string comparison ─────────────────────────────────────────
-
 TEST(flash_checker_cc_on_bang) {
     // Test the /*@cc_on!@*/ pattern - outputs content between @cc_on and @*/
     std::string src = "var isIE = /*@cc_on!@*/0;\n";

@@ -43,14 +43,10 @@ TEST(template_expression_string_brace_does_not_expose_cc) {
     ASSERT_EQ(process(src), src);
 }
 
-// ── Test: Regex containing @ directives (should NOT trigger CC) ──────────────
-
 TEST(regex_with_cc) {
     std::string src = "var r = /@if/;\nvar s = /@end/;\n";
     ASSERT_EQ(process(src), src);
 }
-
-// ── Test: Comments containing @ directives (should NOT trigger CC) ───────────
 
 TEST(line_comment_with_cc) {
     std::string src = "// @cc_on\n// @if\n// @end\n";
@@ -66,8 +62,6 @@ TEST(block_comment_multiline_with_cc) {
     std::string src = "/*\nabc\n@cc_on\n*/\n";
     ASSERT_EQ(process(src), src);
 }
-
-// ── Test: @end inside string (should NOT end CC) ─────────────────────────────
 
 TEST(cc_block_ignores_directives_in_comments) {
     std::string src =
@@ -118,8 +112,6 @@ TEST(cc_block_ignores_directives_in_templates) {
     ASSERT_TRUE(out.find("SHOULD_REMAIN();") != std::string::npos);
 }
 
-// ── Test: //@cc_on form ─────────────────────────────────────────────────────
-
 TEST(double_slash_cc_on) {
     std::string src =
         "foo();\n"
@@ -150,8 +142,6 @@ TEST(double_slash_cc_on_identifier_suffix_is_regular_comment) {
     ASSERT_EQ(process(src), src);
 }
 
-// ── Test: Predefined variables ───────────────────────────────────────────────
-
 TEST(line_cc_on_preserves_crlf) {
     std::string src =
         "//@cc_on\r\n"
@@ -163,8 +153,6 @@ TEST(line_cc_on_preserves_crlf) {
         "yes();\r\n";
     ASSERT_EQ(process(src), expected);
 }
-
-// ── Test: Error recovery ─────────────────────────────────────────────────────
 
 TEST(no_cc_on_basic_if) {
     std::string src =
@@ -344,8 +332,6 @@ TEST(no_cc_on_real_world) {
     ASSERT_FALSE(out.find("@*/") != std::string::npos);
 }
 
-// ── Test: flashChecker function with CC directives ────────────────────────────
-
 TEST(cc_on_bang_inline) {
     // /*@cc_on!@*/ - outputs "!" as content
     std::string src = "var x = /*@cc_on!@*/0;\n";
@@ -426,8 +412,6 @@ TEST(repeated_cc_on_does_not_stall_parser) {
     ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
     ASSERT_FALSE(out.find("@cc_on") != std::string::npos);
 }
-
-// ── Test: Division and modulo expressions ───────────────────────────────────
 
 TEST(regex_after_identifier_is_division) {
     // After a plain identifier, / should be division, not regex

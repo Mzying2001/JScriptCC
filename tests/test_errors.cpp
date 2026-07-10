@@ -10,8 +10,6 @@ TEST(null_nonempty_input_returns_error) {
     ASSERT_EQ(errors.size(), static_cast<std::size_t>(1));
 }
 
-// ── Test: CC block with @if ──────────────────────────────────────────────────
-
 TEST(missing_end) {
     std::string src =
         "/*@cc_on\n"

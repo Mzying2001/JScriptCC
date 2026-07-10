@@ -61,8 +61,6 @@ TEST(cc_if_win32_false) {
     ASSERT_TRUE(out.find("bar();") != std::string::npos);
 }
 
-// ── Test: @if/@else ──────────────────────────────────────────────────────────
-
 TEST(cc_if_else) {
     std::string src =
         "/*@cc_on\n"
@@ -80,8 +78,6 @@ TEST(cc_if_else) {
     ASSERT_TRUE(out.find("alert('other');") != std::string::npos);
     ASSERT_FALSE(out.find("alert('win32');") != std::string::npos);
 }
-
-// ── Test: @if/@elif/@else ────────────────────────────────────────────────────
 
 TEST(cc_if_elif_else) {
     std::string src =
@@ -103,8 +99,6 @@ TEST(cc_if_elif_else) {
     ASSERT_FALSE(out.find("alert('ie9+');") != std::string::npos);
     ASSERT_FALSE(out.find("alert('old');") != std::string::npos);
 }
-
-// ── Test: Nested @if ─────────────────────────────────────────────────────────
 
 TEST(cc_nested_if) {
     std::string src =
@@ -130,8 +124,6 @@ TEST(cc_nested_if) {
     ASSERT_FALSE(out.find("alert('not win32');") != std::string::npos);
 }
 
-// ── Test: @set ───────────────────────────────────────────────────────────────
-
 TEST(cc_empty_block) {
     std::string src =
         "foo();\n"
@@ -143,8 +135,6 @@ TEST(cc_empty_block) {
     ASSERT_TRUE(out.find("foo();") != std::string::npos);
     ASSERT_TRUE(out.find("bar();") != std::string::npos);
 }
-
-// ── Test: Multiple CC blocks ─────────────────────────────────────────────────
 
 TEST(cc_multiple_blocks) {
     std::string src =
@@ -172,8 +162,6 @@ TEST(cc_multiple_blocks) {
     ASSERT_TRUE(out.find("alert('second');") != std::string::npos);
     ASSERT_TRUE(out.find("baz();") != std::string::npos);
 }
-
-// ── Test: String containing @cc_on (should NOT trigger CC) ───────────────────
 
 TEST(end_in_string_in_js) {
     std::string src = "function test(){\n    return \"@end\";\n}\n";
@@ -250,8 +238,6 @@ TEST(large_input_smoke_test) {
     ASSERT_TRUE(output.find("alert('win2');") != std::string::npos);
 }
 
-// ── Test: Complex real-world-like scenario ───────────────────────────────────
-
 TEST(adjacent_cc_blocks) {
     std::string src =
         "/*@cc_on @if(@_win32) alert(1); @end @*/\n"
@@ -264,8 +250,6 @@ TEST(adjacent_cc_blocks) {
     ASSERT_TRUE(out.find("alert(1)") != std::string::npos);
     ASSERT_TRUE(out.find("alert(2)") != std::string::npos);
 }
-
-// ── Test: /*@directive form without cc_on ────────────────────────────────────
 
 TEST(cc_multiple_elif) {
     std::string src =
