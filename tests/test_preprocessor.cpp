@@ -220,7 +220,7 @@ TEST(preserve_crlf_line_endings) {
     ASSERT_EQ(process(src), expected);
 }
 
-TEST(large_file_performance) {
+TEST(large_input_smoke_test) {
     // Generate a 10MB+ source file
     std::string large;
     large.reserve(12 * 1024 * 1024);
@@ -238,24 +238,16 @@ TEST(large_file_performance) {
         large += "var x" + std::to_string(i) + " = " + std::to_string(i) + ";\n";
     }
 
-    auto start = std::chrono::steady_clock::now();
-
     jscriptcc::CCPreprocessor pp;
     std::string output;
     jscriptcc::CCEnvironment env;
     env.set("@_win32", jscriptcc::CCValue(1.0));
     bool ok = pp.process(large, output, env);
 
-    auto end = std::chrono::steady_clock::now();
-    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
-
     ASSERT_TRUE(ok);
     ASSERT_TRUE(output.size() > 0);
     ASSERT_TRUE(output.find("alert('win');") != std::string::npos);
     ASSERT_TRUE(output.find("alert('win2');") != std::string::npos);
-
-    std::cout << "    [Large file: " << large.size() / 1024 << "KB -> "
-              << output.size() / 1024 << "KB in " << ms << "ms]\n";
 }
 
 // ── Test: Complex real-world-like scenario ───────────────────────────────────

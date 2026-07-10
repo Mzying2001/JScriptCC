@@ -2,7 +2,6 @@
 #include "TestFramework.h"
 #include "jscriptcc/CCEnvironment.h"
 #include "jscriptcc/CCPreprocessor.h"
-#include <chrono>
 #include <cstring>
 #include <sstream>
 
