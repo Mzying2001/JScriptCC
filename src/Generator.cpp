@@ -95,13 +95,15 @@ void Generator::processCCBlock(
         contentEnd -= 3;
     }
 
-    // Trim trailing whitespace/newline before @*/
+    // Trim trailing horizontal whitespace and one complete line ending before @*/
     while (contentEnd > contentBegin &&
-           (blockData[contentEnd - 1] == ' ' || blockData[contentEnd - 1] == '\t' ||
-            blockData[contentEnd - 1] == '\r')) {
+           (blockData[contentEnd - 1] == ' ' || blockData[contentEnd - 1] == '\t')) {
         --contentEnd;
     }
     if (contentEnd > contentBegin && blockData[contentEnd - 1] == '\n') {
+        --contentEnd;
+        if (contentEnd > contentBegin && blockData[contentEnd - 1] == '\r') --contentEnd;
+    } else if (contentEnd > contentBegin && blockData[contentEnd - 1] == '\r') {
         --contentEnd;
     }
 

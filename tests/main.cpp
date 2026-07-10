@@ -620,6 +620,36 @@ TEST(preserve_whitespace) {
     ASSERT_TRUE(out.find("bar();") != std::string::npos);
 }
 
+TEST(preserve_crlf_line_endings) {
+    std::string src =
+        "before();\r\n"
+        "/*@cc_on\r\n"
+        "@if(1)\r\n"
+        "yes();\r\n"
+        "@end\r\n"
+        "@*/\r\n"
+        "after();\r\n";
+    std::string expected =
+        "before();\r\n"
+        "\r\n"
+        "yes();\r\n"
+        "\r\n"
+        "after();\r\n";
+    ASSERT_EQ(process(src), expected);
+}
+
+TEST(line_cc_on_preserves_crlf) {
+    std::string src =
+        "//@cc_on\r\n"
+        "@if(1)\r\n"
+        "yes();\r\n"
+        "@end\r\n";
+    std::string expected =
+        "\r\n"
+        "yes();\r\n";
+    ASSERT_EQ(process(src), expected);
+}
+
 // ── Test: Error recovery ─────────────────────────────────────────────────────
 
 TEST(missing_end) {
