@@ -447,16 +447,24 @@ TEST(predefined_jscript) {
     ASSERT_TRUE(out.find("alert('jscript');") != std::string::npos);
 }
 
-TEST(predefined_win32) {
+TEST(predefined_windows_architecture) {
     std::string src =
         "/*@cc_on\n"
         "@if(@_win32)\n"
         "alert('win32');\n"
+        "@elif(@_win64)\n"
+        "alert('win64');\n"
         "@end\n"
         "@*/\n";
 
     std::string out = process(src);
-    ASSERT_TRUE(out.find("alert('win32');") != std::string::npos);
+    if (sizeof(void*) == 8) {
+        ASSERT_TRUE(out.find("alert('win64');") != std::string::npos);
+        ASSERT_FALSE(out.find("alert('win32');") != std::string::npos);
+    } else {
+        ASSERT_TRUE(out.find("alert('win32');") != std::string::npos);
+        ASSERT_FALSE(out.find("alert('win64');") != std::string::npos);
+    }
 }
 
 TEST(predefined_jscript_version) {
