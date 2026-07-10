@@ -4,16 +4,16 @@
 
 namespace jscriptcc {
 
-bool CCPreprocessor::Process(
+bool CCPreprocessor::process(
     const std::string& source,
     std::string& output,
     const CCEnvironment& env,
     std::vector<CCError>* errors)
 {
-    return Process(source.data(), source.size(), output, env, errors);
+    return process(source.data(), source.size(), output, env, errors);
 }
 
-bool CCPreprocessor::Process(
+bool CCPreprocessor::process(
     const char* data,
     std::size_t size,
     std::string& output,

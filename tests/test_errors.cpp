@@ -4,7 +4,7 @@ TEST(null_nonempty_input_returns_error) {
     jscriptcc::CCPreprocessor pp;
     std::string output = "old";
     std::vector<jscriptcc::CCError> errors;
-    bool ok = pp.Process(nullptr, 1, output, jscriptcc::CCEnvironment(), &errors);
+    bool ok = pp.process(nullptr, 1, output, jscriptcc::CCEnvironment(), &errors);
     ASSERT_FALSE(ok);
     ASSERT_TRUE(output.empty());
     ASSERT_EQ(errors.size(), static_cast<std::size_t>(1));
@@ -22,7 +22,7 @@ TEST(missing_end) {
     jscriptcc::CCPreprocessor pp;
     std::string output;
     std::vector<jscriptcc::CCError> errors;
-    pp.Process(src, output, jscriptcc::CCEnvironment(), &errors);
+    pp.process(src, output, jscriptcc::CCEnvironment(), &errors);
 
     // Should have at least one error (missing @end)
     ASSERT_TRUE(errors.size() > 0);
@@ -45,7 +45,7 @@ TEST(errors_use_absolute_source_coordinates) {
     jscriptcc::CCPreprocessor pp;
     std::string output;
     std::vector<jscriptcc::CCError> errors;
-    bool ok = pp.Process(src, output, jscriptcc::CCEnvironment(), &errors);
+    bool ok = pp.process(src, output, jscriptcc::CCEnvironment(), &errors);
     ASSERT_FALSE(ok);
     ASSERT_FALSE(errors.empty());
     ASSERT_EQ(errors.front().line, 8);

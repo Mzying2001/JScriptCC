@@ -13,14 +13,14 @@ namespace jscriptcc {
 class CCPreprocessor {
 public:
     /// Process source string. Returns true if no fatal errors.
-    bool Process(
+    bool process(
         const std::string& source,
         std::string& output,
         const CCEnvironment& env = CCEnvironment(),
         std::vector<CCError>* errors = nullptr);
 
     /// Process with explicit data pointer and size.
-    bool Process(
+    bool process(
         const char* data,
         std::size_t size,
         std::string& output,

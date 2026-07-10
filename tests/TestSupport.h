@@ -12,6 +12,6 @@ inline std::string process(
 {
     jscriptcc::CCPreprocessor preprocessor;
     std::string output;
-    preprocessor.Process(source, output, env);
+    preprocessor.process(source, output, env);
     return output;
 }

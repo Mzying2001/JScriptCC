@@ -14,7 +14,7 @@ TEST(null_empty_input_is_allowed) {
     jscriptcc::CCPreprocessor pp;
     std::string output = "old";
     std::vector<jscriptcc::CCError> errors;
-    bool ok = pp.Process(nullptr, 0, output, jscriptcc::CCEnvironment(), &errors);
+    bool ok = pp.process(nullptr, 0, output, jscriptcc::CCEnvironment(), &errors);
     ASSERT_TRUE(ok);
     ASSERT_TRUE(output.empty());
     ASSERT_TRUE(errors.empty());
@@ -244,7 +244,7 @@ TEST(large_file_performance) {
     std::string output;
     jscriptcc::CCEnvironment env;
     env.set("@_win32", jscriptcc::CCValue(1.0));
-    bool ok = pp.Process(large, output, env);
+    bool ok = pp.process(large, output, env);
 
     auto end = std::chrono::steady_clock::now();
     auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - start).count();
