@@ -2,21 +2,27 @@
 #include <cmath>
 #include <cstring>
 #include <cstdlib>
+#include <cstdint>
 #include <limits>
 
 namespace jscriptcc {
 
 // Safe double-to-int32 conversion matching JScript's ToInt32 semantics.
 // Returns 0 for NaN, Infinity, or values outside int range.
-static int safeToInt32(double v) {
+static std::int32_t safeToInt32(double v) {
     if (std::isnan(v) || std::isinf(v) || v == 0.0) return 0;
     // Use fmod to match ToInt32: n modulo 2^32, then reinterpret as signed
     double two32 = 4294967296.0; // 2^32
     double n = std::fmod(v, two32);
     if (n < 0) n += two32;
     // Now n is in [0, 2^32). Convert to int32 via two's complement.
-    if (n >= 2147483648.0) return static_cast<int>(n - two32);
-    return static_cast<int>(n);
+    if (n >= 2147483648.0) return static_cast<std::int32_t>(n - two32);
+    return static_cast<std::int32_t>(n);
+}
+
+static std::int32_t bitsToInt32(std::uint32_t bits) {
+    if (bits < 0x80000000u) return static_cast<std::int32_t>(bits);
+    return static_cast<std::int32_t>(static_cast<std::int64_t>(bits) - 0x100000000LL);
 }
 
 // ── Main evaluate ────────────────────────────────────────────────────────────
@@ -178,15 +184,23 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
             return CCValue(evalExpr(*node.left).toNumber() - evalExpr(*node.right).toNumber());
 
         case ExprType::Shl: {
-            int l = safeToInt32(evalExpr(*node.left).toNumber());
-            int r = safeToInt32(evalExpr(*node.right).toNumber()) & 0x1f;
-            return CCValue(static_cast<double>(l << r));
+            std::uint32_t left = static_cast<std::uint32_t>(
+                safeToInt32(evalExpr(*node.left).toNumber()));
+            std::uint32_t shift = static_cast<std::uint32_t>(
+                safeToInt32(evalExpr(*node.right).toNumber())) & 0x1f;
+            return CCValue(static_cast<double>(bitsToInt32(left << shift)));
         }
 
         case ExprType::Shr: {
-            int l = safeToInt32(evalExpr(*node.left).toNumber());
-            int r = safeToInt32(evalExpr(*node.right).toNumber()) & 0x1f;
-            return CCValue(static_cast<double>(l >> r));
+            std::uint32_t left = static_cast<std::uint32_t>(
+                safeToInt32(evalExpr(*node.left).toNumber()));
+            std::uint32_t shift = static_cast<std::uint32_t>(
+                safeToInt32(evalExpr(*node.right).toNumber())) & 0x1f;
+            std::uint32_t shifted = left >> shift;
+            if (shift != 0 && (left & 0x80000000u) != 0) {
+                shifted |= 0xffffffffu << (32 - shift);
+            }
+            return CCValue(static_cast<double>(bitsToInt32(shifted)));
         }
 
         case ExprType::Lt:

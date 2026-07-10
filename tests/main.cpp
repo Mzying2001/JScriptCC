@@ -832,6 +832,21 @@ TEST(shift_operators) {
     ASSERT_TRUE(out.find("alert('shl');") != std::string::npos);
 }
 
+TEST(shift_operators_use_int32_bit_patterns) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if((-1 << 1) == -2 &&\n"
+        "    (0x40000000 << 1) == -2147483648 &&\n"
+        "    (-8 >> 2) == -2 &&\n"
+        "    (1 << 33) == 2)\n"
+        "alert('int32');\n"
+        "@end\n"
+        "@*/\n";
+
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('int32');") != std::string::npos);
+}
+
 // ── Test: Adjacent CC blocks ─────────────────────────────────────────────────
 
 TEST(adjacent_cc_blocks) {
