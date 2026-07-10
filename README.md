@@ -56,6 +56,11 @@ int main() {
 
 ## API
 
+The stable public API consists of `CCPreprocessor.h`, `CCEnvironment.h`,
+`CCValue.h`, and `CCError.h`. Scanner, tokenizer, parser, AST, evaluator,
+generator, and string-slice types are implementation details and are not
+public extension points.
+
 ### CCPreprocessor
 
 ```cpp

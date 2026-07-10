@@ -2,7 +2,7 @@
 #include <vector>
 #include "AST.h"
 #include "Tokenizer.h"
-#include "CCError.h"
+#include "jscriptcc/CCError.h"
 
 namespace jscriptcc {
 

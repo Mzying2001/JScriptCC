@@ -1,6 +1,6 @@
 #include "jscriptcc/CCPreprocessor.h"
-#include "jscriptcc/Scanner.h"
-#include "jscriptcc/Generator.h"
+#include "detail/Scanner.h"
+#include "detail/Generator.h"
 
 namespace jscriptcc {
 

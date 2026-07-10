@@ -37,6 +37,7 @@ set(LIB_SOURCES
 
 add_library(jscriptcc STATIC ${LIB_SOURCES})
 target_include_directories(jscriptcc PUBLIC include)
+target_include_directories(jscriptcc PRIVATE src)
 
 # Tests
 enable_testing()

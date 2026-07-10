@@ -1,4 +1,4 @@
-#include "jscriptcc/Tokenizer.h"
+#include "detail/Tokenizer.h"
 #include "CCSyntax.h"
 #include <cctype>
 #include <cstring>

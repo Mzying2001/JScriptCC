@@ -1,4 +1,4 @@
-#include "jscriptcc/Parser.h"
+#include "detail/Parser.h"
 #include <cstring>
 #include <cstdlib>
 #include <new> // std::bad_alloc

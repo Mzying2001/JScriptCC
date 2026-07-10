@@ -1,7 +1,7 @@
 #pragma once
 #include <string>
 #include <vector>
-#include "CCError.h"
+#include "jscriptcc/CCError.h"
 #include "StringSlice.h"
 
 namespace jscriptcc {

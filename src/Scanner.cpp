@@ -1,4 +1,4 @@
-#include "jscriptcc/Scanner.h"
+#include "detail/Scanner.h"
 #include "CCSyntax.h"
 #include <cctype>
 
