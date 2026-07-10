@@ -21,6 +21,146 @@ bool Tokenizer::atEnd() const {
     return pos_ >= size_;
 }
 
+void Tokenizer::beginText() {
+    if (!inText_) {
+        textStart_ = pos_;
+        inText_ = true;
+    }
+}
+
+void Tokenizer::scanLineComment() {
+    beginText();
+    while (!atEnd() && peek() != '\n') advance();
+}
+
+void Tokenizer::scanBlockComment() {
+    beginText();
+    advance();
+    advance();
+    while (!atEnd()) {
+        if (peek() == '*' && peek(1) == '/') {
+            advance();
+            advance();
+            return;
+        }
+        advance();
+    }
+}
+
+void Tokenizer::scanTemplateExpression() {
+    int depth = 1;
+    while (!atEnd() && depth > 0) {
+        char c = peek();
+        if (c == '\'' || c == '"') {
+            char quote = c;
+            advance();
+            while (!atEnd()) {
+                if (peek() == '\\') {
+                    advance();
+                    if (!atEnd()) advance();
+                } else if (peek() == quote) {
+                    advance();
+                    break;
+                } else {
+                    advance();
+                }
+            }
+        } else if (c == '`') {
+            scanTemplateString();
+        } else if (c == '/' && peek(1) == '/') {
+            scanLineComment();
+        } else if (c == '/' && peek(1) == '*') {
+            scanBlockComment();
+        } else if (c == '{') {
+            ++depth;
+            advance();
+        } else if (c == '}') {
+            --depth;
+            advance();
+        } else {
+            advance();
+        }
+    }
+}
+
+void Tokenizer::scanTemplateString() {
+    beginText();
+    advance();
+    while (!atEnd()) {
+        if (peek() == '\\') {
+            advance();
+            if (!atEnd()) advance();
+        } else if (peek() == '`') {
+            advance();
+            return;
+        } else if (peek() == '$' && peek(1) == '{') {
+            advance();
+            advance();
+            scanTemplateExpression();
+        } else {
+            advance();
+        }
+    }
+}
+
+bool Tokenizer::isRegexPosition() const {
+    std::size_t p = pos_;
+    while (p > 0 && (data_[p - 1] == ' ' || data_[p - 1] == '\t' || data_[p - 1] == '\r')) --p;
+    if (p == 0 || data_[p - 1] == '\n') return true;
+
+    char previous = data_[p - 1];
+    switch (previous) {
+        case '(': case '[': case '{': case ',': case ';': case ':':
+        case '=': case '!': case '&': case '|': case '^': case '~':
+        case '+': case '-': case '*': case '%': case '?': case '<': case '>':
+            return true;
+        default:
+            break;
+    }
+
+    if (std::isalnum(static_cast<unsigned char>(previous)) || previous == '_' || previous == '$') {
+        std::size_t end = p;
+        while (p > 0 && (std::isalnum(static_cast<unsigned char>(data_[p - 1])) ||
+                         data_[p - 1] == '_' || data_[p - 1] == '$')) {
+            --p;
+        }
+        StringSlice word(data_ + p, data_ + end);
+        return word == "return" || word == "throw" || word == "case" ||
+               word == "delete" || word == "void" || word == "typeof" ||
+               word == "new" || word == "in" || word == "instanceof" ||
+               word == "yield";
+    }
+
+    return false;
+}
+
+void Tokenizer::scanRegexLiteral() {
+    beginText();
+    advance();
+    bool inCharacterClass = false;
+    while (!atEnd()) {
+        char c = peek();
+        if (c == '\\') {
+            advance();
+            if (!atEnd()) advance();
+        } else if (c == '[') {
+            inCharacterClass = true;
+            advance();
+        } else if (c == ']' && inCharacterClass) {
+            inCharacterClass = false;
+            advance();
+        } else if (c == '/' && !inCharacterClass) {
+            advance();
+            while (!atEnd() && std::isalpha(static_cast<unsigned char>(peek()))) advance();
+            return;
+        } else if (c == '\n' || c == '\r') {
+            return;
+        } else {
+            advance();
+        }
+    }
+}
+
 void Tokenizer::skipSpaces() {
     while (pos_ < size_ && (data_[pos_] == ' ' || data_[pos_] == '\t' || data_[pos_] == '\r')) {
         advance();
@@ -71,6 +211,26 @@ bool Tokenizer::tokenize(const char* data, std::size_t size, CCErrorList* errors
 
 void Tokenizer::scanNext() {
     char c = peek();
+
+    if (c == '/' && peek(1) == '/') {
+        scanLineComment();
+        return;
+    }
+
+    if (c == '/' && peek(1) == '*') {
+        scanBlockComment();
+        return;
+    }
+
+    if (c == '`') {
+        scanTemplateString();
+        return;
+    }
+
+    if (c == '/' && isRegexPosition()) {
+        scanRegexLiteral();
+        return;
+    }
 
     // Newline
     if (c == '\n') {
@@ -136,14 +296,14 @@ void Tokenizer::scanNext() {
         }
 
         // @ followed by something else — treat as text
-        if (!inText_) { textStart_ = pos_; inText_ = true; }
+        beginText();
         advance();
         return;
     }
 
     // Skip spaces (not newlines) — they're part of text
     if (c == ' ' || c == '\t' || c == '\r') {
-        if (!inText_) { textStart_ = pos_; inText_ = true; }
+        beginText();
         advance();
         return;
     }
@@ -286,7 +446,7 @@ void Tokenizer::scanNext() {
     }
 
     // Unknown character — treat as text
-    if (!inText_) { textStart_ = pos_; inText_ = true; }
+    beginText();
     advance();
 }
 

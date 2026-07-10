@@ -412,6 +412,55 @@ TEST(end_in_string_in_js) {
     ASSERT_EQ(process(src), src);
 }
 
+TEST(cc_block_ignores_directives_in_comments) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if(1)\n"
+        "keep1();\n"
+        "// @if(0) this is only a comment\n"
+        "SHOULD_REMAIN();\n"
+        "// @end this is only a comment\n"
+        "/* @else and @end are also comments */\n"
+        "keep2();\n"
+        "@end\n"
+        "@*/\n";
+
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("SHOULD_REMAIN();") != std::string::npos);
+    ASSERT_TRUE(out.find("// @if(0) this is only a comment") != std::string::npos);
+    ASSERT_TRUE(out.find("/* @else and @end are also comments */") != std::string::npos);
+}
+
+TEST(cc_block_ignores_directives_in_regex) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if(1)\n"
+        "var first = /@if(0)/;\n"
+        "var second = /[@end/]/g;\n"
+        "SHOULD_REMAIN();\n"
+        "@end\n"
+        "@*/\n";
+
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("var first = /@if(0)/;") != std::string::npos);
+    ASSERT_TRUE(out.find("var second = /[@end/]/g;") != std::string::npos);
+    ASSERT_TRUE(out.find("SHOULD_REMAIN();") != std::string::npos);
+}
+
+TEST(cc_block_ignores_directives_in_templates) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if(1)\n"
+        "const text = `@if(0) ${'@end'} @else`;\n"
+        "SHOULD_REMAIN();\n"
+        "@end\n"
+        "@*/\n";
+
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("const text = `@if(0) ${'@end'} @else`;") != std::string::npos);
+    ASSERT_TRUE(out.find("SHOULD_REMAIN();") != std::string::npos);
+}
+
 // ── Test: //@cc_on form ─────────────────────────────────────────────────────
 
 TEST(double_slash_cc_on) {

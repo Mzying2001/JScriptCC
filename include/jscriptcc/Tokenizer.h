@@ -77,6 +77,13 @@ private:
     void scanNumber();
     void scanString(char quote);
     void scanText();     // Collect non-directive text
+    void scanLineComment();
+    void scanBlockComment();
+    void scanTemplateString();
+    void scanTemplateExpression();
+    void scanRegexLiteral();
+    bool isRegexPosition() const;
+    void beginText();
     void addToken(TokenType type, const char* begin, const char* end);
     void addError(int line, int col, const std::string& msg);
     char peek(std::size_t offset = 0) const;
