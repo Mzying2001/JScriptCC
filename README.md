@@ -4,16 +4,12 @@ A C++11 library that preprocesses IE JScript Conditional Compilation (`@cc_on`) 
 
 ## Features
 
-- Converts `@cc_on`, `@if`, `@elif`, `@else`, `@end`, `@set` directives to plain JS
-- No JS parser — modern JS (ES2025+) passes through untouched
-- Correctly ignores `@` directives inside strings, comments, regex, and template literals
-- Supports `/*@cc_on ... @*/` block form and `//@cc_on` line form
-- Also supports `/*@if ... @*/` without `cc_on` (matches old IE behavior)
-- Full expression evaluation with arithmetic, comparison, logical, and bitwise operators
-- Predefined variables: `@_jscript`, `@_jscript_version`, `@_win32`, `@_win64`, `@_x86`, `@_amd64`, `@_debug`, etc.
-- User-definable variables via `@set` and `CCEnvironment`
-- Error recovery — continues parsing on malformed input
-- C++11, zero dependencies, RAII, `std::unique_ptr` for AST memory
+- Converts JScript conditional compilation directives into plain JavaScript
+- Supports block and line forms, including `/*@if ... @*/` without `cc_on`
+- Preserves modern JavaScript, including strings, comments, regex, and template literals
+- Evaluates arithmetic, comparison, logical, and bitwise expressions
+- Provides IE-compatible predefined variables and custom variables via `@set` or `CCEnvironment`
+- Offers error recovery in a dependency-free C++11 library
 
 ## Quick Start
 
@@ -56,10 +52,7 @@ int main() {
 
 ## API
 
-The stable public API consists of `CCPreprocessor.h`, `CCEnvironment.h`,
-`CCValue.h`, and `CCError.h`. Scanner, tokenizer, parser, AST, evaluator,
-generator, and string-slice types are implementation details and are not
-public extension points.
+The stable public API consists of `CCPreprocessor.h`, `CCEnvironment.h`, `CCValue.h`, and `CCError.h`. Scanner, tokenizer, parser, AST, evaluator, generator, and string-slice types are implementation details and are not public extension points.
 
 ### CCPreprocessor
 
@@ -80,10 +73,6 @@ public:
 - `errors` — optional, receives error list with line/column info
 - Returns `true` if no fatal errors
 
-Migration note: the former `CCPreprocessor::Process` entry point was renamed
-to `CCPreprocessor::process`. The old name is not retained; update call sites
-to use the lower-camel-case API shown above.
-
 ### CCEnvironment
 
 ```cpp
@@ -97,17 +86,17 @@ jscriptcc::CCEnvironment win64(jscriptcc::TargetArchitecture::Win64);
 
 Default predefined variables:
 
-| Variable           | Default               | Description          |
-| ------------------ | --------------------- | -------------------- |
-| `@_jscript`        | 1                     | Always 1 in JScript  |
-| `@_jscript_version`| 5.8                   | JScript version      |
-| `@_win16`          | 0                     | 16-bit Windows       |
-| `@_win32`          | 1                     | 32-bit Windows       |
-| `@_win64`          | 0                     | 64-bit Windows       |
-| `@_x86`            | 1                     | x86 processor        |
-| `@_amd64`          | 0                     | AMD64 processor      |
-| `@_mac`            | 0                     | macOS                |
-| `@_debug`          | 0                     | Debug mode           |
+| Variable            | Default | Description         |
+| ------------------- | ------- | ------------------- |
+| `@_jscript`         | 1       | Always 1 in JScript |
+| `@_jscript_version` | 5.8     | JScript version     |
+| `@_win16`           | 0       | 16-bit Windows      |
+| `@_win32`           | 1       | 32-bit Windows      |
+| `@_win64`           | 0       | 64-bit Windows      |
+| `@_x86`             | 1       | x86 processor       |
+| `@_amd64`           | 0       | AMD64 processor     |
+| `@_mac`             | 0       | macOS               |
+| `@_debug`           | 0       | Debug mode          |
 
 > The default environment targets Win32 JScript 5.8 on every host. Pass `TargetArchitecture::Win64` to the `CCEnvironment` constructor to select the Win64/AMD64 predefined variables explicitly.
 
