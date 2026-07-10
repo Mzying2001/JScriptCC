@@ -349,35 +349,9 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                                 if (pos_ > segmentStart) {
                                     emitSegment(SegmentType::NormalJS, segmentStart, pos_);
                                 }
-                                // We don't emit the directive here — we let the
-                                // rest of the scanner handle it. Actually, for
-                                // the //@cc_on case, we need to emit a CC block
-                                // that contains this directive and everything
-                                // until the next directive or end of source.
-                                //
-                                // Wait, actually the simplest approach: emit
-                                // each @ directive as part of a CC block that
-                                // extends until the next @ directive (at the
-                                // start of a line) or end of source.
-                                //
-                                // But that's complex. Simpler: just emit
-                                // everything from //@cc_on to end as one CC block.
-                                // The tokenizer handles extracting directives.
-                                //
-                                // But we already skipped strings/comments above,
-                                // so we know where the @ directives are. Let me
-                                // reconsider.
-                                //
-                                // Actually the SIMPLEST correct approach:
-                                // After //@cc_on, emit the ENTIRE remaining
-                                // source as a CCBlock. The tokenizer will
-                                // handle it. But the tokenizer needs to be
-                                // smart enough to handle strings inside CC blocks.
-                                //
-                                // Let me just do that. We'll make the tokenizer
-                                // handle strings/comments within CC content.
-                                // Emit everything from this directive to end as CCBlock.
-                                // The tokenizer will handle extracting directives.
+                                // Conditional compilation remains active after
+                                // //@cc_on, so Tokenizer processes the source from
+                                // the first real directive through end of input.
                                 emitSegment(SegmentType::CCBlock, pos_, size_);
                                 pos_ = size_;
                                 segmentStart = pos_;
