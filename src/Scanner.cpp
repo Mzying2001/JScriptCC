@@ -276,7 +276,9 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 std::size_t lookPos = pos_ + 2;
                 if (lookPos + 6 <= size_ &&
                     std::memcmp(data_ + lookPos, "@cc_on", 6) == 0 &&
-                    (lookPos + 6 >= size_ || !std::isalnum(static_cast<unsigned char>(data_[lookPos + 6]))))
+                    (lookPos + 6 >= size_ ||
+                     !(std::isalnum(static_cast<unsigned char>(data_[lookPos + 6])) ||
+                       data_[lookPos + 6] == '_' || data_[lookPos + 6] == '$')))
                 {
                     if (pos_ > segmentStart) {
                         emitSegment(SegmentType::NormalJS, segmentStart, pos_);

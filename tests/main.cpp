@@ -500,6 +500,17 @@ TEST(double_slash_cc_on) {
     ASSERT_FALSE(out.find("@if") != std::string::npos);
 }
 
+TEST(double_slash_cc_on_identifier_suffix_is_regular_comment) {
+    std::string src =
+        "//@cc_on_helper\n"
+        "//@cc_on$helper\n"
+        "//@cc_on1\n"
+        "@if(0)\n"
+        "SHOULD_STAY();\n"
+        "@end\n";
+    ASSERT_EQ(process(src), src);
+}
+
 // ── Test: Predefined variables ───────────────────────────────────────────────
 
 TEST(predefined_jscript) {
