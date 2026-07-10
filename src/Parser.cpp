@@ -76,6 +76,7 @@ std::unique_ptr<BlockNode> Parser::parse(const std::vector<Token>& tokens, CCErr
             continue;
         }
 
+        std::size_t statementStart = pos_;
         try {
             auto stmt = parseStatement();
             if (stmt) {
@@ -85,6 +86,11 @@ std::unique_ptr<BlockNode> Parser::parse(const std::vector<Token>& tokens, CCErr
             throw; // Don't swallow memory exhaustion
         } catch (...) {
             synchronize();
+        }
+
+        if (pos_ == statementStart && !atEnd()) {
+            addError(current(), "Parser made no progress");
+            advance();
         }
     }
 
@@ -99,6 +105,10 @@ ASTNodePtr Parser::parseStatement() {
     }
     if (check(TokenType::SET)) {
         return parseSet();
+    }
+    if (check(TokenType::CC_ON)) {
+        advance();
+        return nullptr;
     }
     if (check(TokenType::ELIF) || check(TokenType::ELSE) || check(TokenType::END)) {
         // These are handled by parseIf, seeing them here means they're orphaned

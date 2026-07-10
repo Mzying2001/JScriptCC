@@ -1230,6 +1230,20 @@ TEST(cc_on_multiple_bang_usages) {
     ASSERT_TRUE(out.find("var b = !1;") != std::string::npos);
 }
 
+TEST(repeated_cc_on_does_not_stall_parser) {
+    std::string src =
+        "/*@cc_on\n"
+        "@cc_on\n"
+        "@if(1)\n"
+        "alert('ok');\n"
+        "@end\n"
+        "@*/\n";
+
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
+    ASSERT_FALSE(out.find("@cc_on") != std::string::npos);
+}
+
 // ── Test: Division and modulo expressions ───────────────────────────────────
 
 TEST(expr_division) {
