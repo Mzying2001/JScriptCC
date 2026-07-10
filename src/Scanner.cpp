@@ -1,5 +1,5 @@
 #include "detail/Scanner.h"
-#include "CCSyntax.h"
+#include "detail/CCLexicalRules.h"
 #include <cctype>
 
 namespace jscriptcc {
@@ -96,9 +96,9 @@ void Scanner::skipTemplateExpression() {
             std::size_t start = pos_;
             do {
                 adv();
-            } while (pos_ < size_ && isJSIdentifierChar(data_[pos_]));
+            } while (pos_ < size_ && detail::isJSIdentifierChar(data_[pos_]));
             StringSlice word(data_ + start, data_ + pos_);
-            regexAllowed = isRegexEnablingKeyword(word.data(), word.size());
+            regexAllowed = detail::isRegexEnablingKeyword(word.data(), word.size());
         } else if (std::isdigit(static_cast<unsigned char>(c))) {
             do {
                 adv();
@@ -112,7 +112,7 @@ void Scanner::skipTemplateExpression() {
             } else if (c != ' ' && c != '\t' && c != '\r') {
                 if (c == ')' || c == ']') {
                     regexAllowed = false;
-                } else if (isRegexPrefixPunctuator(c)) {
+                } else if (detail::isRegexPrefixPunctuator(c)) {
                     regexAllowed = true;
                 }
             }
@@ -191,7 +191,7 @@ void Scanner::skipRegexLiteral() {
 bool Scanner::isRegexPosition() const {
     if (lastSignificantChar_ == 0) return true;
     return lastSignificantChar_ == '\n' ||
-           isRegexPrefixPunctuator(lastSignificantChar_) ||
+           detail::isRegexPrefixPunctuator(lastSignificantChar_) ||
            lastWasRegexKeyword_ || lastWasOperator_;
 }
 
@@ -314,17 +314,17 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                             bool isRegex = true;
                             if (pos_ > 0) {
                                 char prev = data_[pos_ - 1];
-                                if (isJSIdentifierChar(prev) || prev == ')' || prev == ']') {
+                                if (detail::isJSIdentifierChar(prev) || prev == ')' || prev == ']') {
                                     // Check if the preceding identifier is a regex keyword
                                     std::size_t identEnd = pos_;
                                     std::size_t identStart = identEnd;
-                                    while (identStart > 0 && isJSIdentifierChar(data_[identStart - 1])) {
+                                    while (identStart > 0 && detail::isJSIdentifierChar(data_[identStart - 1])) {
                                         --identStart;
                                     }
                                     if (identStart < identEnd) {
                                         std::size_t len = identEnd - identStart;
                                         const char* p = data_ + identStart;
-                                        isRegex = isRegexEnablingKeyword(p, len);
+                                        isRegex = detail::isRegexEnablingKeyword(p, len);
                                     } else {
                                         // prev is ) or ] — division
                                         isRegex = false;
@@ -340,9 +340,9 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
 
                         // Check for @if, @elif, @else, @end, @set
                         if (c == '@') {
-                            CCDirective directive = matchCCDirective(data_, size_, pos_);
-                            bool isDirective = directive != CCDirective::None &&
-                                               directive != CCDirective::CCOn;
+                            detail::CCDirective directive = detail::matchCCDirective(data_, size_, pos_);
+                            bool isDirective = directive != detail::CCDirective::None &&
+                                               directive != detail::CCDirective::CCOn;
 
                             if (isDirective) {
                                 // Emit any preceding normal JS
@@ -383,7 +383,7 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 std::size_t lookPos = pos_ + 2;
                 bool isCCBlock = false;
 
-                isCCBlock = matchCCDirective(data_, size_, lookPos) != CCDirective::None;
+                isCCBlock = detail::matchCCDirective(data_, size_, lookPos) != detail::CCDirective::None;
 
                 if (isCCBlock) {
                     if (pos_ > segmentStart) {
@@ -429,13 +429,13 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 // Non-identifier: check if accumulated identifier is a
                 // JS keyword that enables regex position (return, typeof, etc.)
                 if (!lastIdentifier_.empty()) {
-                    lastWasRegexKeyword_ = isRegexEnablingKeyword(
+                    lastWasRegexKeyword_ = detail::isRegexEnablingKeyword(
                         lastIdentifier_.data(), lastIdentifier_.size());
                     lastIdentifier_.clear();
                 } else {
                     lastWasRegexKeyword_ = false;
                 }
-                lastWasOperator_ = isRegexPrefixPunctuator(c);
+                lastWasOperator_ = detail::isRegexPrefixPunctuator(c);
                 lastSignificantChar_ = c;
             }
 

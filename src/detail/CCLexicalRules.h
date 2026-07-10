@@ -4,6 +4,12 @@
 #include <cstring>
 
 namespace jscriptcc {
+namespace detail {
+
+// Shared, stateless lexical rules used by source segmentation and CC
+// tokenization. Scanner and Tokenizer intentionally keep separate state
+// machines because they operate at different scopes and produce different
+// outputs; only syntax classification rules that must agree live here.
 
 enum class CCDirective {
     None,
@@ -86,4 +92,5 @@ inline CCDirective matchCCDirective(
     return CCDirective::None;
 }
 
+} // namespace detail
 } // namespace jscriptcc

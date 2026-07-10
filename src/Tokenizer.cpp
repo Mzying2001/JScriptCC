@@ -1,5 +1,5 @@
 #include "detail/Tokenizer.h"
-#include "CCSyntax.h"
+#include "detail/CCLexicalRules.h"
 #include <cctype>
 #include <cstring>
 
@@ -110,14 +110,14 @@ bool Tokenizer::isRegexPosition() const {
     if (p == 0 || data_[p - 1] == '\n') return true;
 
     char previous = data_[p - 1];
-    if (isRegexPrefixPunctuator(previous)) return true;
+    if (detail::isRegexPrefixPunctuator(previous)) return true;
 
-    if (isJSIdentifierChar(previous)) {
+    if (detail::isJSIdentifierChar(previous)) {
         std::size_t end = p;
-        while (p > 0 && isJSIdentifierChar(data_[p - 1])) {
+        while (p > 0 && detail::isJSIdentifierChar(data_[p - 1])) {
             --p;
         }
-        return isRegexEnablingKeyword(data_ + p, end - p);
+        return detail::isRegexEnablingKeyword(data_ + p, end - p);
     }
 
     return false;
@@ -254,17 +254,17 @@ void Tokenizer::scanNext() {
 
     // Check for @ directives
     if (c == '@') {
-        CCDirective directive = matchCCDirective(data_, size_, pos_);
-        if (directive != CCDirective::None) {
+        detail::CCDirective directive = detail::matchCCDirective(data_, size_, pos_);
+        if (directive != detail::CCDirective::None) {
             TokenType type = TokenType::END_OF_INPUT;
             switch (directive) {
-                case CCDirective::CCOn: type = TokenType::CC_ON; break;
-                case CCDirective::If:   type = TokenType::IF; break;
-                case CCDirective::Elif: type = TokenType::ELIF; break;
-                case CCDirective::Else: type = TokenType::ELSE; break;
-                case CCDirective::End:  type = TokenType::END; break;
-                case CCDirective::Set:  type = TokenType::SET; break;
-                case CCDirective::None: break;
+                case detail::CCDirective::CCOn: type = TokenType::CC_ON; break;
+                case detail::CCDirective::If:   type = TokenType::IF; break;
+                case detail::CCDirective::Elif: type = TokenType::ELIF; break;
+                case detail::CCDirective::Else: type = TokenType::ELSE; break;
+                case detail::CCDirective::End:  type = TokenType::END; break;
+                case detail::CCDirective::Set:  type = TokenType::SET; break;
+                case detail::CCDirective::None: break;
             }
 
             if (inText_) {
@@ -272,7 +272,7 @@ void Tokenizer::scanNext() {
                 inText_ = false;
             }
             const char* start = data_ + pos_;
-            while (pos_ < size_ && isJSIdentifierChar(peek(1))) {
+            while (pos_ < size_ && detail::isJSIdentifierChar(peek(1))) {
                 advance();
             }
             advance();
