@@ -171,8 +171,18 @@ void Tokenizer::addToken(TokenType type, const char* begin, const char* end) {
     Token tok;
     tok.type = type;
     tok.text = StringSlice(begin, end);
-    tok.line = line_;
-    tok.column = col_;
+    std::size_t beginPos = static_cast<std::size_t>(begin - data_);
+    while (locationPos_ < beginPos) {
+        if (data_[locationPos_] == '\n') {
+            ++locationLine_;
+            locationColumn_ = 1;
+        } else {
+            ++locationColumn_;
+        }
+        ++locationPos_;
+    }
+    tok.line = locationLine_;
+    tok.column = locationColumn_;
     tokens_.push_back(tok);
 }
 
@@ -184,12 +194,21 @@ void Tokenizer::addError(int line, int col, const std::string& msg) {
 
 // ── Main tokenize ────────────────────────────────────────────────────────────
 
-bool Tokenizer::tokenize(const char* data, std::size_t size, CCErrorList* errors) {
+bool Tokenizer::tokenize(
+    const char* data,
+    std::size_t size,
+    CCErrorList* errors,
+    int initialLine,
+    int initialColumn)
+{
     data_ = data;
     size_ = size;
     pos_ = 0;
-    line_ = 1;
-    col_ = 1;
+    line_ = initialLine;
+    col_ = initialColumn;
+    locationPos_ = 0;
+    locationLine_ = initialLine;
+    locationColumn_ = initialColumn;
     errors_ = errors;
     tokens_.clear();
     textStart_ = 0;

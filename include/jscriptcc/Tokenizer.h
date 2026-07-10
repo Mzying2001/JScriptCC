@@ -67,7 +67,12 @@ struct Token {
 /// Does NOT parse normal JavaScript — only CC directives and expressions.
 class Tokenizer {
 public:
-    bool tokenize(const char* data, std::size_t size, CCErrorList* errors = nullptr);
+    bool tokenize(
+        const char* data,
+        std::size_t size,
+        CCErrorList* errors = nullptr,
+        int initialLine = 1,
+        int initialColumn = 1);
 
     const std::vector<Token>& tokens() const { return tokens_; }
 
@@ -96,6 +101,9 @@ private:
     std::size_t pos_ = 0;
     int line_ = 1;
     int col_ = 1;
+    std::size_t locationPos_ = 0;
+    int locationLine_ = 1;
+    int locationColumn_ = 1;
     std::size_t textStart_ = 0;  // Start of current TEXT run
     bool inText_ = false;
 

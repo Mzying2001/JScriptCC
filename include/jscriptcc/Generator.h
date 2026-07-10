@@ -24,6 +24,8 @@ private:
         const char* blockData,
         std::size_t blockBegin,
         std::size_t blockEnd,
+        int blockLine,
+        int blockColumn,
         CCEnvironment& env,
         std::string& output);
 

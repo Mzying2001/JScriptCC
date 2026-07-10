@@ -668,6 +668,30 @@ TEST(missing_end) {
     ASSERT_TRUE(errors.size() > 0);
 }
 
+TEST(errors_use_absolute_source_coordinates) {
+    std::string src =
+        "first();\n"
+        "/*@if(1)\n"
+        "ok();\n"
+        "@end\n"
+        "@*/\n"
+        "middle();\n"
+        "/*@cc_on\n"
+        "@if()\n"
+        "bad();\n"
+        "@end\n"
+        "@*/\n";
+
+    jscriptcc::CCPreprocessor pp;
+    std::string output;
+    std::vector<jscriptcc::CCError> errors;
+    bool ok = pp.Process(src, output, jscriptcc::CCEnvironment(), &errors);
+    ASSERT_FALSE(ok);
+    ASSERT_FALSE(errors.empty());
+    ASSERT_EQ(errors.front().line, 8);
+    ASSERT_EQ(errors.front().column, 5);
+}
+
 // ── Test: Large file performance ─────────────────────────────────────────────
 
 TEST(large_file_performance) {

@@ -18,8 +18,21 @@ bool Generator::generate(
     output.reserve(sourceSize); // reasonable estimate
 
     std::size_t errorCount = errors_ ? errors_->size() : 0;
+    std::size_t sourcePosition = 0;
+    int sourceLine = 1;
+    int sourceColumn = 1;
 
     for (const auto& seg : segments) {
+        while (sourcePosition < seg.begin) {
+            if (sourceData[sourcePosition] == '\n') {
+                ++sourceLine;
+                sourceColumn = 1;
+            } else {
+                ++sourceColumn;
+            }
+            ++sourcePosition;
+        }
+
         switch (seg.type) {
             case SegmentType::NormalJS: {
                 // Copy normal JS verbatim
@@ -29,7 +42,8 @@ bool Generator::generate(
 
             case SegmentType::CCBlock: {
                 // Process /*@cc_on ... @*/
-                processCCBlock(sourceData, seg.begin, seg.end, env, output);
+                processCCBlock(
+                    sourceData, seg.begin, seg.end, sourceLine, sourceColumn, env, output);
                 break;
             }
 
@@ -44,6 +58,17 @@ bool Generator::generate(
                 break;
             }
         }
+
+
+        while (sourcePosition < seg.end) {
+            if (sourceData[sourcePosition] == '\n') {
+                ++sourceLine;
+                sourceColumn = 1;
+            } else {
+                ++sourceColumn;
+            }
+            ++sourcePosition;
+        }
     }
 
     // Return false if any errors were added during processing
@@ -54,6 +79,8 @@ void Generator::processCCBlock(
     const char* blockData,
     std::size_t blockBegin,
     std::size_t blockEnd,
+    int blockLine,
+    int blockColumn,
     CCEnvironment& env,
     std::string& output)
 {
@@ -65,25 +92,39 @@ void Generator::processCCBlock(
     // stop before @*/
     std::size_t contentBegin = blockBegin;
     std::size_t contentEnd = blockEnd;
+    int contentLine = blockLine;
+    int contentColumn = blockColumn;
 
     // Skip /*@cc_on (or /*@directive) and the newline after it
     if (contentBegin + 2 < blockEnd &&
         blockData[contentBegin] == '/' && blockData[contentBegin + 1] == '*') {
         contentBegin += 2; // skip /*
+        contentColumn += 2;
         const char* p = blockData + contentBegin;
         const char* end = blockData + contentEnd;
+        auto advanceContent = [&]() {
+            if (*p == '\n') {
+                ++contentLine;
+                contentColumn = 1;
+            } else {
+                ++contentColumn;
+            }
+            ++p;
+        };
         // Skip whitespace before @cc_on
-        while (p < end && (*p == ' ' || *p == '\t')) ++p;
+        while (p < end && (*p == ' ' || *p == '\t')) advanceContent();
         // Skip @cc_on
         if (p + 6 <= end && std::memcmp(p, "@cc_on", 6) == 0) {
-            p += 6;
+            for (int i = 0; i < 6; ++i) advanceContent();
         } else {
             // Skip directive keyword (@if, @elif, @else, @end, @set)
-            while (p < end && (std::isalnum(static_cast<unsigned char>(*p)) || *p == '_')) ++p;
+            while (p < end && (std::isalnum(static_cast<unsigned char>(*p)) || *p == '_')) {
+                advanceContent();
+            }
         }
         // Skip whitespace and newline after @cc_on / directive
-        while (p < end && (*p == ' ' || *p == '\t' || *p == '\r')) ++p;
-        if (p < end && *p == '\n') ++p;
+        while (p < end && (*p == ' ' || *p == '\t' || *p == '\r')) advanceContent();
+        if (p < end && *p == '\n') advanceContent();
         contentBegin = static_cast<std::size_t>(p - blockData);
     }
 
@@ -114,7 +155,7 @@ void Generator::processCCBlock(
     const char* contentData = blockData + contentBegin;
 
     Tokenizer tokenizer;
-    tokenizer.tokenize(contentData, contentSize, errors_);
+    tokenizer.tokenize(contentData, contentSize, errors_, contentLine, contentColumn);
 
     // Parse
     Parser parser;
