@@ -458,5 +458,3 @@ TEST(division_in_expression_preserved) {
     std::string src = "var result = 10 / 2 / 5;\n";
     ASSERT_EQ(process(src), src);
 }
-
-// ── Test: Nested @elif chains ──────────────────────────────────────────────

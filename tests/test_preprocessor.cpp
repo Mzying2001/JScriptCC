@@ -287,5 +287,3 @@ TEST(cc_multiple_elif) {
     ASSERT_FALSE(out.find("alert(2);") != std::string::npos);
     ASSERT_FALSE(out.find("alert(4);") != std::string::npos);
 }
-
-// ── Main ─────────────────────────────────────────────────────────────────────

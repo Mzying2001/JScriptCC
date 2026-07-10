@@ -204,5 +204,3 @@ TEST(flash_checker_with_cc_if_old_version) {
     ASSERT_TRUE(out.find("hasFlash = -1") != std::string::npos);
     ASSERT_FALSE(out.find("ActiveXObject") != std::string::npos);
 }
-
-// ── Test: @cc_on with various content after it ───────────────────────────────

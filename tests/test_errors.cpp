@@ -51,5 +51,3 @@ TEST(errors_use_absolute_source_coordinates) {
     ASSERT_EQ(errors.front().line, 8);
     ASSERT_EQ(errors.front().column, 5);
 }
-
-// ── Test: Large file performance ─────────────────────────────────────────────

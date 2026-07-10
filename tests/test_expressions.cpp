@@ -368,5 +368,3 @@ TEST(expr_eq) {
     std::string out = process(src);
     ASSERT_TRUE(out.find("alert('ok');") != std::string::npos);
 }
-
-// ── Test: Regex vs division in normal JS ───────────────────────────────────
