@@ -14,6 +14,7 @@ endif()
 
 # Library sources
 set(LIB_SOURCES
+    src/CCValue.cpp
     src/Scanner.cpp
     src/Tokenizer.cpp
     src/Parser.cpp
