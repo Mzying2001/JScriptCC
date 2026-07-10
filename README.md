@@ -82,6 +82,8 @@ jscriptcc::CCEnvironment env;
 env.set("@_win32", jscriptcc::CCValue(0.0));       // override predefined
 env.set("@MY_FLAG", jscriptcc::CCValue(1.0));      // add custom variable
 env.set("@VERSION", jscriptcc::CCValue("2.0"));    // string value
+
+jscriptcc::CCEnvironment win64(jscriptcc::TargetArchitecture::Win64);
 ```
 
 Default predefined variables:
@@ -91,14 +93,14 @@ Default predefined variables:
 | `@_jscript`        | 1                     | Always 1 in JScript  |
 | `@_jscript_version`| 5.8                   | JScript version      |
 | `@_win16`          | 0                     | 16-bit Windows       |
-| `@_win32`          | `sizeof(void*) != 8`  | 32-bit Windows       |
-| `@_win64`          | `sizeof(void*) == 8`  | 64-bit Windows       |
-| `@_x86`            | `sizeof(void*) != 8`  | x86 processor        |
-| `@_amd64`          | `sizeof(void*) == 8`  | AMD64 processor      |
+| `@_win32`          | 1                     | 32-bit Windows       |
+| `@_win64`          | 0                     | 64-bit Windows       |
+| `@_x86`            | 1                     | x86 processor        |
+| `@_amd64`          | 0                     | AMD64 processor      |
 | `@_mac`            | 0                     | macOS                |
 | `@_debug`          | 0                     | Debug mode           |
 
-> `@_win32`/`@_win64` and `@_x86`/`@_amd64` are set at compile time based on the program's pointer size. A 64-bit build gets `@_win64=1, @_amd64=1`; a 32-bit build gets `@_win32=1, @_x86=1`.
+> The default environment targets Win32 JScript 5.8 on every host. Pass `TargetArchitecture::Win64` to the `CCEnvironment` constructor to select the Win64/AMD64 predefined variables explicitly.
 
 ### CCError
 

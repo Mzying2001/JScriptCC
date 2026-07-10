@@ -556,13 +556,13 @@ TEST(predefined_windows_architecture) {
         "@*/\n";
 
     std::string out = process(src);
-    if (sizeof(void*) == 8) {
-        ASSERT_TRUE(out.find("alert('win64');") != std::string::npos);
-        ASSERT_FALSE(out.find("alert('win32');") != std::string::npos);
-    } else {
-        ASSERT_TRUE(out.find("alert('win32');") != std::string::npos);
-        ASSERT_FALSE(out.find("alert('win64');") != std::string::npos);
-    }
+    ASSERT_TRUE(out.find("alert('win32');") != std::string::npos);
+    ASSERT_FALSE(out.find("alert('win64');") != std::string::npos);
+
+    jscriptcc::CCEnvironment win64(jscriptcc::TargetArchitecture::Win64);
+    out = process(src, win64);
+    ASSERT_TRUE(out.find("alert('win64');") != std::string::npos);
+    ASSERT_FALSE(out.find("alert('win32');") != std::string::npos);
 }
 
 TEST(predefined_jscript_version) {

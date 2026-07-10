@@ -2,7 +2,8 @@
 
 namespace jscriptcc {
 
-CCEnvironment::CCEnvironment() {
+CCEnvironment::CCEnvironment(TargetArchitecture architecture)
+    : architecture_(architecture) {
     setDefaults();
 }
 
@@ -12,7 +13,7 @@ void CCEnvironment::setDefaults() {
     variables["@_jscript"] = CCValue(1.0);
     variables["@_jscript_version"] = CCValue(5.8);  // IE8+ JScript version
     variables["@_win16"] = CCValue(0.0);
-    if (sizeof(void*) == 8) {
+    if (architecture_ == TargetArchitecture::Win64) {
         variables["@_win32"] = CCValue(0.0);
         variables["@_win64"] = CCValue(1.0);
         variables["@_x86"] = CCValue(0.0);
