@@ -110,26 +110,14 @@ bool Tokenizer::isRegexPosition() const {
     if (p == 0 || data_[p - 1] == '\n') return true;
 
     char previous = data_[p - 1];
-    switch (previous) {
-        case '(': case '[': case '{': case ',': case ';': case ':':
-        case '=': case '!': case '&': case '|': case '^': case '~':
-        case '+': case '-': case '*': case '%': case '?': case '<': case '>':
-            return true;
-        default:
-            break;
-    }
+    if (isRegexPrefixPunctuator(previous)) return true;
 
-    if (std::isalnum(static_cast<unsigned char>(previous)) || previous == '_' || previous == '$') {
+    if (isJSIdentifierChar(previous)) {
         std::size_t end = p;
-        while (p > 0 && (std::isalnum(static_cast<unsigned char>(data_[p - 1])) ||
-                         data_[p - 1] == '_' || data_[p - 1] == '$')) {
+        while (p > 0 && isJSIdentifierChar(data_[p - 1])) {
             --p;
         }
-        StringSlice word(data_ + p, data_ + end);
-        return word == "return" || word == "throw" || word == "case" ||
-               word == "delete" || word == "void" || word == "typeof" ||
-               word == "new" || word == "in" || word == "instanceof" ||
-               word == "yield";
+        return isRegexEnablingKeyword(data_ + p, end - p);
     }
 
     return false;

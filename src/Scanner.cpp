@@ -96,14 +96,9 @@ void Scanner::skipTemplateExpression() {
             std::size_t start = pos_;
             do {
                 adv();
-            } while (pos_ < size_ &&
-                     (std::isalnum(static_cast<unsigned char>(data_[pos_])) ||
-                      data_[pos_] == '_' || data_[pos_] == '$'));
+            } while (pos_ < size_ && isJSIdentifierChar(data_[pos_]));
             StringSlice word(data_ + start, data_ + pos_);
-            regexAllowed = word == "return" || word == "throw" || word == "case" ||
-                           word == "delete" || word == "void" || word == "typeof" ||
-                           word == "new" || word == "in" || word == "instanceof" ||
-                           word == "yield";
+            regexAllowed = isRegexEnablingKeyword(word.data(), word.size());
         } else if (std::isdigit(static_cast<unsigned char>(c))) {
             do {
                 adv();
@@ -115,17 +110,10 @@ void Scanner::skipTemplateExpression() {
             if (c == '\n') {
                 advanceLine();
             } else if (c != ' ' && c != '\t' && c != '\r') {
-                switch (c) {
-                    case ')': case ']':
-                        regexAllowed = false;
-                        break;
-                    case '(': case '[': case ',': case ';': case ':':
-                    case '=': case '!': case '&': case '|': case '^': case '~':
-                    case '+': case '-': case '*': case '%': case '?': case '<': case '>':
-                        regexAllowed = true;
-                        break;
-                    default:
-                        break;
+                if (c == ')' || c == ']') {
+                    regexAllowed = false;
+                } else if (isRegexPrefixPunctuator(c)) {
+                    regexAllowed = true;
                 }
             }
             adv();
@@ -202,15 +190,9 @@ void Scanner::skipRegexLiteral() {
 
 bool Scanner::isRegexPosition() const {
     if (lastSignificantChar_ == 0) return true;
-    switch (lastSignificantChar_) {
-        case '(': case '[': case '{': case ',': case ';':
-        case '!': case '&': case '|': case '^': case '~':
-        case '+': case '-': case '=': case '?': case ':':
-        case '\n': case '>':
-            return true;
-        default:
-            return lastWasRegexKeyword_ || lastWasOperator_;
-    }
+    return lastSignificantChar_ == '\n' ||
+           isRegexPrefixPunctuator(lastSignificantChar_) ||
+           lastWasRegexKeyword_ || lastWasOperator_;
 }
 
 // ── Main scan ────────────────────────────────────────────────────────────────
@@ -332,29 +314,17 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                             bool isRegex = true;
                             if (pos_ > 0) {
                                 char prev = data_[pos_ - 1];
-                                if (std::isalnum(static_cast<unsigned char>(prev)) || prev == '_' || prev == ')' || prev == ']') {
+                                if (isJSIdentifierChar(prev) || prev == ')' || prev == ']') {
                                     // Check if the preceding identifier is a regex keyword
                                     std::size_t identEnd = pos_;
                                     std::size_t identStart = identEnd;
-                                    while (identStart > 0 && (std::isalnum(static_cast<unsigned char>(data_[identStart - 1])) || data_[identStart - 1] == '_')) {
+                                    while (identStart > 0 && isJSIdentifierChar(data_[identStart - 1])) {
                                         --identStart;
                                     }
                                     if (identStart < identEnd) {
                                         std::size_t len = identEnd - identStart;
                                         const char* p = data_ + identStart;
-                                        isRegex = false; // default: identifier -> division
-                                        // Override for regex-enabling keywords
-                                        if ((len == 2 && std::memcmp(p, "in", 2) == 0) ||
-                                            (len == 3 && std::memcmp(p, "new", 3) == 0) ||
-                                            (len == 4 && (std::memcmp(p, "void", 4) == 0 || std::memcmp(p, "case", 4) == 0))) {
-                                            isRegex = true;
-                                        } else if (len == 5 && (std::memcmp(p, "throw", 5) == 0 || std::memcmp(p, "yield", 5) == 0)) {
-                                            isRegex = true;
-                                        } else if (len == 6 && (std::memcmp(p, "return", 6) == 0 || std::memcmp(p, "typeof", 6) == 0 || std::memcmp(p, "delete", 6) == 0)) {
-                                            isRegex = true;
-                                        } else if (len == 10 && std::memcmp(p, "instanceof", 10) == 0) {
-                                            isRegex = true;
-                                        }
+                                        isRegex = isRegexEnablingKeyword(p, len);
                                     } else {
                                         // prev is ) or ] — division
                                         isRegex = false;
@@ -485,27 +455,13 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 // Non-identifier: check if accumulated identifier is a
                 // JS keyword that enables regex position (return, typeof, etc.)
                 if (!lastIdentifier_.empty()) {
-                    lastWasRegexKeyword_ =
-                        lastIdentifier_ == "return" || lastIdentifier_ == "typeof" ||
-                        lastIdentifier_ == "delete" || lastIdentifier_ == "void" ||
-                        lastIdentifier_ == "throw" || lastIdentifier_ == "new" ||
-                        lastIdentifier_ == "in" || lastIdentifier_ == "instanceof" ||
-                        lastIdentifier_ == "case" || lastIdentifier_ == "yield";
+                    lastWasRegexKeyword_ = isRegexEnablingKeyword(
+                        lastIdentifier_.data(), lastIdentifier_.size());
                     lastIdentifier_.clear();
                 } else {
                     lastWasRegexKeyword_ = false;
                 }
-                switch (c) {
-                    case '+': case '-': case '*': case '%':
-                    case '<': case '>': case '=': case '!':
-                    case '&': case '|': case '^': case '~':
-                    case '?': case ':':
-                        lastWasOperator_ = true;
-                        break;
-                    default:
-                        lastWasOperator_ = false;
-                        break;
-                }
+                lastWasOperator_ = isRegexPrefixPunctuator(c);
                 lastSignificantChar_ = c;
             }
 
