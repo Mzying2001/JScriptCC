@@ -1,4 +1,5 @@
 #include "jscriptcc/Scanner.h"
+#include "CCSyntax.h"
 #include <cctype>
 
 namespace jscriptcc {
@@ -369,27 +370,9 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
 
                         // Check for @if, @elif, @else, @end, @set
                         if (c == '@') {
-                            auto isIdentChar = [](char ch) -> bool {
-                                return std::isalnum(static_cast<unsigned char>(ch)) || ch == '_';
-                            };
-
-                            bool isDirective = false;
-
-                            // Check each directive
-                            struct DirCheck { const char* name; std::size_t len; };
-                            DirCheck dirs[] = {
-                                {"@if", 3}, {"@elif", 5}, {"@else", 5},
-                                {"@end", 4}, {"@set", 4}
-                            };
-                            for (auto& d : dirs) {
-                                if (pos_ + d.len <= size_ &&
-                                    std::memcmp(data_ + pos_, d.name, d.len) == 0 &&
-                                    (pos_ + d.len >= size_ || !isIdentChar(data_[pos_ + d.len])))
-                                {
-                                    isDirective = true;
-                                    break;
-                                }
-                            }
+                            CCDirective directive = matchCCDirective(data_, size_, pos_);
+                            bool isDirective = directive != CCDirective::None &&
+                                               directive != CCDirective::CCOn;
 
                             if (isDirective) {
                                 // Emit any preceding normal JS
@@ -456,35 +439,7 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 std::size_t lookPos = pos_ + 2;
                 bool isCCBlock = false;
 
-                // Check for /*@cc_on (must not be part of a longer identifier like @cc_onwards)
-                if (lookPos + 6 <= size_ &&
-                    std::memcmp(data_ + lookPos, "@cc_on", 6) == 0 &&
-                    (lookPos + 6 >= size_ ||
-                     !(std::isalnum(static_cast<unsigned char>(data_[lookPos + 6])) || data_[lookPos + 6] == '_')))
-                {
-                    isCCBlock = true;
-                }
-
-                // Check for /*@directive (@if, @elif, @else, @end, @set)
-                if (!isCCBlock && lookPos + 3 <= size_ && data_[lookPos] == '@') {
-                    auto isIdentChar = [](char ch) -> bool {
-                        return std::isalnum(static_cast<unsigned char>(ch)) || ch == '_';
-                    };
-                    struct DirCheck { const char* name; std::size_t len; };
-                    DirCheck dirs[] = {
-                        {"@if", 3}, {"@elif", 5}, {"@else", 5},
-                        {"@end", 4}, {"@set", 4}
-                    };
-                    for (auto& d : dirs) {
-                        if (lookPos + d.len <= size_ &&
-                            std::memcmp(data_ + lookPos, d.name, d.len) == 0 &&
-                            (lookPos + d.len >= size_ || !isIdentChar(data_[lookPos + d.len])))
-                        {
-                            isCCBlock = true;
-                            break;
-                        }
-                    }
-                }
+                isCCBlock = matchCCDirective(data_, size_, lookPos) != CCDirective::None;
 
                 if (isCCBlock) {
                     if (pos_ > segmentStart) {

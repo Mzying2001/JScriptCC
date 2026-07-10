@@ -1337,6 +1337,13 @@ TEST(cc_on_longer_identifier_not_matched) {
     ASSERT_TRUE(out.find("/*@cc_onwards*/") != std::string::npos);
 }
 
+TEST(cc_directive_dollar_suffix_not_matched) {
+    std::string src =
+        "var a = /*@cc_on$debug*/1;\n"
+        "var b = /*@if$debug*/2;\n";
+    ASSERT_EQ(process(src), src);
+}
+
 TEST(cc_on_with_set) {
     // /*@cc_on @set ... @*/ - @cc_on followed by @set
     std::string src =

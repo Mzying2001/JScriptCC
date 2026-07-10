@@ -1,4 +1,5 @@
 #include "jscriptcc/Tokenizer.h"
+#include "CCSyntax.h"
 #include <cctype>
 #include <cstring>
 
@@ -265,37 +266,30 @@ void Tokenizer::scanNext() {
 
     // Check for @ directives
     if (c == '@') {
-        auto isIdentChar = [](char ch) -> bool {
-            return std::isalnum(static_cast<unsigned char>(ch)) || ch == '_';
-        };
-
-        // Try to match directives
-        struct DirMatch { const char* name; TokenType type; };
-        DirMatch directives[] = {
-            {"@cc_on", TokenType::CC_ON},
-            {"@if",    TokenType::IF},
-            {"@elif",  TokenType::ELIF},
-            {"@else",  TokenType::ELSE},
-            {"@end",   TokenType::END},
-            {"@set",   TokenType::SET},
-        };
-
-        for (auto& d : directives) {
-            std::size_t len = std::strlen(d.name);
-            if (pos_ + len <= size_ &&
-                std::memcmp(data_ + pos_, d.name, len) == 0 &&
-                (pos_ + len >= size_ || !isIdentChar(data_[pos_ + len])))
-            {
-                // Flush preceding text
-                if (inText_) {
-                    addToken(TokenType::TEXT, data_ + textStart_, data_ + pos_);
-                    inText_ = false;
-                }
-                const char* start = data_ + pos_;
-                for (std::size_t i = 0; i < len; ++i) advance();
-                addToken(d.type, start, data_ + pos_);
-                return;
+        CCDirective directive = matchCCDirective(data_, size_, pos_);
+        if (directive != CCDirective::None) {
+            TokenType type = TokenType::END_OF_INPUT;
+            switch (directive) {
+                case CCDirective::CCOn: type = TokenType::CC_ON; break;
+                case CCDirective::If:   type = TokenType::IF; break;
+                case CCDirective::Elif: type = TokenType::ELIF; break;
+                case CCDirective::Else: type = TokenType::ELSE; break;
+                case CCDirective::End:  type = TokenType::END; break;
+                case CCDirective::Set:  type = TokenType::SET; break;
+                case CCDirective::None: break;
             }
+
+            if (inText_) {
+                addToken(TokenType::TEXT, data_ + textStart_, data_ + pos_);
+                inText_ = false;
+            }
+            const char* start = data_ + pos_;
+            while (pos_ < size_ && isJSIdentifierChar(peek(1))) {
+                advance();
+            }
+            advance();
+            addToken(type, start, data_ + pos_);
+            return;
         }
 
         // @ followed by identifier (variable like @_win32)
