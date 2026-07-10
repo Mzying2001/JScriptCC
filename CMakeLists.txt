@@ -40,15 +40,16 @@ endif()
 enable_testing()
 add_executable(jscriptcc_tests
     tests/main.cpp
-    tests/TestFramework.cpp
-    tests/test_preprocessor.cpp
-    tests/test_scanner.cpp
-    tests/test_expressions.cpp
-    tests/test_environment.cpp
-    tests/test_errors.cpp
-    tests/test_regressions.cpp
+    tests/support/TestFramework.cpp
+    tests/cases/test_preprocessor.cpp
+    tests/cases/test_scanner.cpp
+    tests/cases/test_expressions.cpp
+    tests/cases/test_environment.cpp
+    tests/cases/test_errors.cpp
+    tests/cases/test_regressions.cpp
 )
 target_link_libraries(jscriptcc_tests jscriptcc)
+target_include_directories(jscriptcc_tests PRIVATE tests)
 set_target_properties(jscriptcc_tests PROPERTIES CXX_EXTENSIONS OFF)
 
 if(MSVC)

@@ -57,8 +57,9 @@ src/
     (library implementation files)
 
 tests/
-    TestFramework.*     # Self-contained test registration and runner support
-    test_*.cpp          # Tests grouped by responsibility
+    main.cpp            # Test runner entry point
+    support/            # Self-contained test framework and shared helpers
+    cases/              # Test sources grouped by responsibility
 ```
 
 ## Architecture

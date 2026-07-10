@@ -1,4 +1,4 @@
-#include "TestSupport.h"
+#include "support/TestSupport.h"
 
 TEST(normal_js_with_comments) {
     std::string src = "// line comment\n/* block comment */\nvar x = 1;\n";

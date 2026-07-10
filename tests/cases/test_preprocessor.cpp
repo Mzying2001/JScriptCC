@@ -1,4 +1,4 @@
-#include "TestSupport.h"
+#include "support/TestSupport.h"
 
 TEST(normal_js_unchanged) {
     std::string src = "var x = 1;\nfunction foo() { return 42; }\n";

@@ -1,5 +1,5 @@
 #pragma once
-#include "TestFramework.h"
+#include "support/TestFramework.h"
 #include "jscriptcc/CCEnvironment.h"
 #include "jscriptcc/CCPreprocessor.h"
 #include <cstring>

@@ -1,4 +1,4 @@
-#include "TestSupport.h"
+#include "support/TestSupport.h"
 
 TEST(null_nonempty_input_returns_error) {
     jscriptcc::CCPreprocessor pp;

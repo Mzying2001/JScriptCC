@@ -1,4 +1,4 @@
-#include "TestSupport.h"
+#include "support/TestSupport.h"
 
 TEST(expr_comparison) {
     std::string src =

@@ -1,4 +1,4 @@
-#include "TestFramework.h"
+#include "support/TestFramework.h"
 
 std::vector<TestCase>& testRegistry() { static std::vector<TestCase> registry; return registry; }
 int& testsPassed() { static int value = 0; return value; }
