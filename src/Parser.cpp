@@ -126,25 +126,7 @@ std::unique_ptr<IfNode> Parser::parseIf() {
     advance(); // consume @if
     {
         Branch branch;
-        // Condition is optional in JScript CC (bare @if evaluates the expression)
-        if (check(TokenType::LPAREN)) {
-            advance(); // consume (
-            branch.condition = parseExpression();
-            skipWhitespace();
-            if (!check(TokenType::RPAREN)) {
-                addError(current(), "Expected ')' after @if condition");
-            } else {
-                advance(); // consume )
-            }
-        } else if (!check(TokenType::NEWLINE) && !check(TokenType::END_OF_INPUT) &&
-                   current().type != TokenType::IF && current().type != TokenType::ELIF &&
-                   current().type != TokenType::ELSE && current().type != TokenType::END &&
-                   current().type != TokenType::SET) {
-            // Bare expression without parentheses
-            branch.condition = parseExpression();
-        } else {
-            addError(current(), "@if requires a condition");
-        }
+        branch.condition = parseBranchCondition("@if");
 
         // Parse body (everything until @elif, @else, @end)
         while (!atEnd() && !check(TokenType::ELIF) && !check(TokenType::ELSE) &&
@@ -160,23 +142,7 @@ std::unique_ptr<IfNode> Parser::parseIf() {
     while (check(TokenType::ELIF)) {
         advance(); // consume @elif
         Branch branch;
-        if (check(TokenType::LPAREN)) {
-            advance();
-            branch.condition = parseExpression();
-            skipWhitespace();
-            if (!check(TokenType::RPAREN)) {
-                addError(current(), "Expected ')' after @elif condition");
-            } else {
-                advance();
-            }
-        } else if (!check(TokenType::NEWLINE) && !check(TokenType::END_OF_INPUT) &&
-                   current().type != TokenType::IF && current().type != TokenType::ELIF &&
-                   current().type != TokenType::ELSE && current().type != TokenType::END &&
-                   current().type != TokenType::SET) {
-            branch.condition = parseExpression();
-        } else {
-            addError(current(), "@elif requires a condition");
-        }
+        branch.condition = parseBranchCondition("@elif");
 
         while (!atEnd() && !check(TokenType::ELIF) && !check(TokenType::ELSE) &&
                !check(TokenType::END)) {
@@ -209,6 +175,30 @@ std::unique_ptr<IfNode> Parser::parseIf() {
     }
 
     return ifNode;
+}
+
+ExprNodePtr Parser::parseBranchCondition(const char* directiveName) {
+    if (check(TokenType::LPAREN)) {
+        advance();
+        ExprNodePtr condition = parseExpression();
+        skipWhitespace();
+        if (!check(TokenType::RPAREN)) {
+            addError(current(), std::string("Expected ')' after ") + directiveName + " condition");
+        } else {
+            advance();
+        }
+        return condition;
+    }
+
+    if (!check(TokenType::NEWLINE) && !check(TokenType::END_OF_INPUT) &&
+        current().type != TokenType::IF && current().type != TokenType::ELIF &&
+        current().type != TokenType::ELSE && current().type != TokenType::END &&
+        current().type != TokenType::SET) {
+        return parseExpression();
+    }
+
+    addError(current(), std::string(directiveName) + " requires a condition");
+    return nullptr;
 }
 
 std::unique_ptr<SetNode> Parser::parseSet() {

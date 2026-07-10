@@ -16,6 +16,7 @@ private:
     // Parsing methods
     ASTNodePtr parseStatement();
     std::unique_ptr<IfNode> parseIf();
+    ExprNodePtr parseBranchCondition(const char* directiveName);
     std::unique_ptr<SetNode> parseSet();
     ASTNodePtr parseText();
 
