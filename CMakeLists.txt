@@ -14,10 +14,8 @@ endif()
 
 # Library sources
 set(LIB_SOURCES
-    src/StringSlice.cpp
     src/Scanner.cpp
     src/Tokenizer.cpp
-    src/AST.cpp
     src/Parser.cpp
     src/Evaluator.cpp
     src/Generator.cpp
