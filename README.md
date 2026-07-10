@@ -45,7 +45,7 @@ int main() {
 
     jscriptcc::CCPreprocessor pp;
     std::string output;
-    pp.Process(source, output);
+    pp.process(source, output);
 
     std::cout << output;
     // foo();
@@ -56,16 +56,21 @@ int main() {
 
 ## API
 
+The stable public API consists of `CCPreprocessor.h`, `CCEnvironment.h`,
+`CCValue.h`, and `CCError.h`. Scanner, tokenizer, parser, AST, evaluator,
+generator, and string-slice types are implementation details and are not
+public extension points.
+
 ### CCPreprocessor
 
 ```cpp
 class CCPreprocessor {
 public:
-    bool Process(
+    bool process(
         const std::string& source,
         std::string& output,
         const CCEnvironment& env = CCEnvironment(),
-        std::vector<CCError>* errors = nullptr);
+        CCErrorList* errors = nullptr);
 };
 ```
 
@@ -74,6 +79,10 @@ public:
 - `env` — environment with predefined and user variables
 - `errors` — optional, receives error list with line/column info
 - Returns `true` if no fatal errors
+
+Migration note: the former `CCPreprocessor::Process` entry point was renamed
+to `CCPreprocessor::process`. The old name is not retained; update call sites
+to use the lower-camel-case API shown above.
 
 ### CCEnvironment
 

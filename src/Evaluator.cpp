@@ -1,4 +1,4 @@
-#include "jscriptcc/Evaluator.h"
+#include "detail/Evaluator.h"
 #include <cmath>
 #include <cstring>
 #include <cstdlib>

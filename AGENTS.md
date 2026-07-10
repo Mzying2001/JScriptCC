@@ -47,23 +47,19 @@ Normal JavaScript (including ES2025+) passes through unchanged. Strings, comment
 
 ```
 include/jscriptcc/
-    CCPreprocessor.h    # Main API: CCPreprocessor::Process()
+    CCPreprocessor.h    # Main preprocessing API
     CCEnvironment.h     # Predefined variables (@_win32, @_jscript, etc.)
     CCValue.h           # Variant type (number/string/bool)
     CCError.h           # Error struct with line/column
-    Scanner.h           # State machine: identifies CC blocks in source
-    Tokenizer.h         # Tokenizes CC block content into tokens
-    Parser.h            # Parses CC tokens into AST (Pratt parser for expressions)
-    AST.h               # Node types: BlockNode, IfNode, SetNode, TextNode, ExprNode
-    Evaluator.h         # Evaluates AST against environment
-    Generator.h         # Orchestrates scan→tokenize→parse→evaluate pipeline
-    StringSlice.h       # Non-owning string view (C++11 string_view equivalent)
 
 src/
-    (one .cpp per header above)
+    detail/             # Internal scanner/tokenizer/parser/AST/evaluator headers
+    (library implementation files)
 
 tests/
-    main.cpp            # Self-contained test suite (no third-party deps)
+    main.cpp            # Test runner entry point
+    support/            # Self-contained test framework and shared helpers
+    cases/              # Test sources grouped by responsibility
 ```
 
 ## Architecture

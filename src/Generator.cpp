@@ -1,7 +1,7 @@
-#include "jscriptcc/Generator.h"
-#include "jscriptcc/Tokenizer.h"
-#include "jscriptcc/Parser.h"
-#include "jscriptcc/Evaluator.h"
+#include "detail/Generator.h"
+#include "detail/Tokenizer.h"
+#include "detail/Parser.h"
+#include "detail/Evaluator.h"
 
 namespace jscriptcc {
 

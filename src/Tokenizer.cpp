@@ -1,4 +1,5 @@
-#include "jscriptcc/Tokenizer.h"
+#include "detail/Tokenizer.h"
+#include "detail/CCLexicalRules.h"
 #include <cctype>
 #include <cstring>
 
@@ -109,26 +110,14 @@ bool Tokenizer::isRegexPosition() const {
     if (p == 0 || data_[p - 1] == '\n') return true;
 
     char previous = data_[p - 1];
-    switch (previous) {
-        case '(': case '[': case '{': case ',': case ';': case ':':
-        case '=': case '!': case '&': case '|': case '^': case '~':
-        case '+': case '-': case '*': case '%': case '?': case '<': case '>':
-            return true;
-        default:
-            break;
-    }
+    if (detail::isRegexPrefixPunctuator(previous)) return true;
 
-    if (std::isalnum(static_cast<unsigned char>(previous)) || previous == '_' || previous == '$') {
+    if (detail::isJSIdentifierChar(previous)) {
         std::size_t end = p;
-        while (p > 0 && (std::isalnum(static_cast<unsigned char>(data_[p - 1])) ||
-                         data_[p - 1] == '_' || data_[p - 1] == '$')) {
+        while (p > 0 && detail::isJSIdentifierChar(data_[p - 1])) {
             --p;
         }
-        StringSlice word(data_ + p, data_ + end);
-        return word == "return" || word == "throw" || word == "case" ||
-               word == "delete" || word == "void" || word == "typeof" ||
-               word == "new" || word == "in" || word == "instanceof" ||
-               word == "yield";
+        return detail::isRegexEnablingKeyword(data_ + p, end - p);
     }
 
     return false;
@@ -265,37 +254,30 @@ void Tokenizer::scanNext() {
 
     // Check for @ directives
     if (c == '@') {
-        auto isIdentChar = [](char ch) -> bool {
-            return std::isalnum(static_cast<unsigned char>(ch)) || ch == '_';
-        };
-
-        // Try to match directives
-        struct DirMatch { const char* name; TokenType type; };
-        DirMatch directives[] = {
-            {"@cc_on", TokenType::CC_ON},
-            {"@if",    TokenType::IF},
-            {"@elif",  TokenType::ELIF},
-            {"@else",  TokenType::ELSE},
-            {"@end",   TokenType::END},
-            {"@set",   TokenType::SET},
-        };
-
-        for (auto& d : directives) {
-            std::size_t len = std::strlen(d.name);
-            if (pos_ + len <= size_ &&
-                std::memcmp(data_ + pos_, d.name, len) == 0 &&
-                (pos_ + len >= size_ || !isIdentChar(data_[pos_ + len])))
-            {
-                // Flush preceding text
-                if (inText_) {
-                    addToken(TokenType::TEXT, data_ + textStart_, data_ + pos_);
-                    inText_ = false;
-                }
-                const char* start = data_ + pos_;
-                for (std::size_t i = 0; i < len; ++i) advance();
-                addToken(d.type, start, data_ + pos_);
-                return;
+        detail::CCDirective directive = detail::matchCCDirective(data_, size_, pos_);
+        if (directive != detail::CCDirective::None) {
+            TokenType type = TokenType::END_OF_INPUT;
+            switch (directive) {
+                case detail::CCDirective::CCOn: type = TokenType::CC_ON; break;
+                case detail::CCDirective::If:   type = TokenType::IF; break;
+                case detail::CCDirective::Elif: type = TokenType::ELIF; break;
+                case detail::CCDirective::Else: type = TokenType::ELSE; break;
+                case detail::CCDirective::End:  type = TokenType::END; break;
+                case detail::CCDirective::Set:  type = TokenType::SET; break;
+                case detail::CCDirective::None: break;
             }
+
+            if (inText_) {
+                addToken(TokenType::TEXT, data_ + textStart_, data_ + pos_);
+                inText_ = false;
+            }
+            const char* start = data_ + pos_;
+            while (pos_ < size_ && detail::isJSIdentifierChar(peek(1))) {
+                advance();
+            }
+            advance();
+            addToken(type, start, data_ + pos_);
+            return;
         }
 
         // @ followed by identifier (variable like @_win32)

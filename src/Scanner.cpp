@@ -1,4 +1,5 @@
-#include "jscriptcc/Scanner.h"
+#include "detail/Scanner.h"
+#include "detail/CCLexicalRules.h"
 #include <cctype>
 
 namespace jscriptcc {
@@ -95,14 +96,9 @@ void Scanner::skipTemplateExpression() {
             std::size_t start = pos_;
             do {
                 adv();
-            } while (pos_ < size_ &&
-                     (std::isalnum(static_cast<unsigned char>(data_[pos_])) ||
-                      data_[pos_] == '_' || data_[pos_] == '$'));
+            } while (pos_ < size_ && detail::isJSIdentifierChar(data_[pos_]));
             StringSlice word(data_ + start, data_ + pos_);
-            regexAllowed = word == "return" || word == "throw" || word == "case" ||
-                           word == "delete" || word == "void" || word == "typeof" ||
-                           word == "new" || word == "in" || word == "instanceof" ||
-                           word == "yield";
+            regexAllowed = detail::isRegexEnablingKeyword(word.data(), word.size());
         } else if (std::isdigit(static_cast<unsigned char>(c))) {
             do {
                 adv();
@@ -114,17 +110,10 @@ void Scanner::skipTemplateExpression() {
             if (c == '\n') {
                 advanceLine();
             } else if (c != ' ' && c != '\t' && c != '\r') {
-                switch (c) {
-                    case ')': case ']':
-                        regexAllowed = false;
-                        break;
-                    case '(': case '[': case ',': case ';': case ':':
-                    case '=': case '!': case '&': case '|': case '^': case '~':
-                    case '+': case '-': case '*': case '%': case '?': case '<': case '>':
-                        regexAllowed = true;
-                        break;
-                    default:
-                        break;
+                if (c == ')' || c == ']') {
+                    regexAllowed = false;
+                } else if (detail::isRegexPrefixPunctuator(c)) {
+                    regexAllowed = true;
                 }
             }
             adv();
@@ -201,15 +190,9 @@ void Scanner::skipRegexLiteral() {
 
 bool Scanner::isRegexPosition() const {
     if (lastSignificantChar_ == 0) return true;
-    switch (lastSignificantChar_) {
-        case '(': case '[': case '{': case ',': case ';':
-        case '!': case '&': case '|': case '^': case '~':
-        case '+': case '-': case '=': case '?': case ':':
-        case '\n': case '>':
-            return true;
-        default:
-            return lastWasRegexKeyword_ || lastWasOperator_;
-    }
+    return lastSignificantChar_ == '\n' ||
+           detail::isRegexPrefixPunctuator(lastSignificantChar_) ||
+           lastWasRegexKeyword_ || lastWasOperator_;
 }
 
 // ── Main scan ────────────────────────────────────────────────────────────────
@@ -331,29 +314,17 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                             bool isRegex = true;
                             if (pos_ > 0) {
                                 char prev = data_[pos_ - 1];
-                                if (std::isalnum(static_cast<unsigned char>(prev)) || prev == '_' || prev == ')' || prev == ']') {
+                                if (detail::isJSIdentifierChar(prev) || prev == ')' || prev == ']') {
                                     // Check if the preceding identifier is a regex keyword
                                     std::size_t identEnd = pos_;
                                     std::size_t identStart = identEnd;
-                                    while (identStart > 0 && (std::isalnum(static_cast<unsigned char>(data_[identStart - 1])) || data_[identStart - 1] == '_')) {
+                                    while (identStart > 0 && detail::isJSIdentifierChar(data_[identStart - 1])) {
                                         --identStart;
                                     }
                                     if (identStart < identEnd) {
                                         std::size_t len = identEnd - identStart;
                                         const char* p = data_ + identStart;
-                                        isRegex = false; // default: identifier -> division
-                                        // Override for regex-enabling keywords
-                                        if ((len == 2 && std::memcmp(p, "in", 2) == 0) ||
-                                            (len == 3 && std::memcmp(p, "new", 3) == 0) ||
-                                            (len == 4 && (std::memcmp(p, "void", 4) == 0 || std::memcmp(p, "case", 4) == 0))) {
-                                            isRegex = true;
-                                        } else if (len == 5 && (std::memcmp(p, "throw", 5) == 0 || std::memcmp(p, "yield", 5) == 0)) {
-                                            isRegex = true;
-                                        } else if (len == 6 && (std::memcmp(p, "return", 6) == 0 || std::memcmp(p, "typeof", 6) == 0 || std::memcmp(p, "delete", 6) == 0)) {
-                                            isRegex = true;
-                                        } else if (len == 10 && std::memcmp(p, "instanceof", 10) == 0) {
-                                            isRegex = true;
-                                        }
+                                        isRegex = detail::isRegexEnablingKeyword(p, len);
                                     } else {
                                         // prev is ) or ] — division
                                         isRegex = false;
@@ -369,62 +340,18 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
 
                         // Check for @if, @elif, @else, @end, @set
                         if (c == '@') {
-                            auto isIdentChar = [](char ch) -> bool {
-                                return std::isalnum(static_cast<unsigned char>(ch)) || ch == '_';
-                            };
-
-                            bool isDirective = false;
-
-                            // Check each directive
-                            struct DirCheck { const char* name; std::size_t len; };
-                            DirCheck dirs[] = {
-                                {"@if", 3}, {"@elif", 5}, {"@else", 5},
-                                {"@end", 4}, {"@set", 4}
-                            };
-                            for (auto& d : dirs) {
-                                if (pos_ + d.len <= size_ &&
-                                    std::memcmp(data_ + pos_, d.name, d.len) == 0 &&
-                                    (pos_ + d.len >= size_ || !isIdentChar(data_[pos_ + d.len])))
-                                {
-                                    isDirective = true;
-                                    break;
-                                }
-                            }
+                            detail::CCDirective directive = detail::matchCCDirective(data_, size_, pos_);
+                            bool isDirective = directive != detail::CCDirective::None &&
+                                               directive != detail::CCDirective::CCOn;
 
                             if (isDirective) {
                                 // Emit any preceding normal JS
                                 if (pos_ > segmentStart) {
                                     emitSegment(SegmentType::NormalJS, segmentStart, pos_);
                                 }
-                                // We don't emit the directive here — we let the
-                                // rest of the scanner handle it. Actually, for
-                                // the //@cc_on case, we need to emit a CC block
-                                // that contains this directive and everything
-                                // until the next directive or end of source.
-                                //
-                                // Wait, actually the simplest approach: emit
-                                // each @ directive as part of a CC block that
-                                // extends until the next @ directive (at the
-                                // start of a line) or end of source.
-                                //
-                                // But that's complex. Simpler: just emit
-                                // everything from //@cc_on to end as one CC block.
-                                // The tokenizer handles extracting directives.
-                                //
-                                // But we already skipped strings/comments above,
-                                // so we know where the @ directives are. Let me
-                                // reconsider.
-                                //
-                                // Actually the SIMPLEST correct approach:
-                                // After //@cc_on, emit the ENTIRE remaining
-                                // source as a CCBlock. The tokenizer will
-                                // handle it. But the tokenizer needs to be
-                                // smart enough to handle strings inside CC blocks.
-                                //
-                                // Let me just do that. We'll make the tokenizer
-                                // handle strings/comments within CC content.
-                                // Emit everything from this directive to end as CCBlock.
-                                // The tokenizer will handle extracting directives.
+                                // Conditional compilation remains active after
+                                // //@cc_on, so Tokenizer processes the source from
+                                // the first real directive through end of input.
                                 emitSegment(SegmentType::CCBlock, pos_, size_);
                                 pos_ = size_;
                                 segmentStart = pos_;
@@ -456,35 +383,7 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 std::size_t lookPos = pos_ + 2;
                 bool isCCBlock = false;
 
-                // Check for /*@cc_on (must not be part of a longer identifier like @cc_onwards)
-                if (lookPos + 6 <= size_ &&
-                    std::memcmp(data_ + lookPos, "@cc_on", 6) == 0 &&
-                    (lookPos + 6 >= size_ ||
-                     !(std::isalnum(static_cast<unsigned char>(data_[lookPos + 6])) || data_[lookPos + 6] == '_')))
-                {
-                    isCCBlock = true;
-                }
-
-                // Check for /*@directive (@if, @elif, @else, @end, @set)
-                if (!isCCBlock && lookPos + 3 <= size_ && data_[lookPos] == '@') {
-                    auto isIdentChar = [](char ch) -> bool {
-                        return std::isalnum(static_cast<unsigned char>(ch)) || ch == '_';
-                    };
-                    struct DirCheck { const char* name; std::size_t len; };
-                    DirCheck dirs[] = {
-                        {"@if", 3}, {"@elif", 5}, {"@else", 5},
-                        {"@end", 4}, {"@set", 4}
-                    };
-                    for (auto& d : dirs) {
-                        if (lookPos + d.len <= size_ &&
-                            std::memcmp(data_ + lookPos, d.name, d.len) == 0 &&
-                            (lookPos + d.len >= size_ || !isIdentChar(data_[lookPos + d.len])))
-                        {
-                            isCCBlock = true;
-                            break;
-                        }
-                    }
-                }
+                isCCBlock = detail::matchCCDirective(data_, size_, lookPos) != detail::CCDirective::None;
 
                 if (isCCBlock) {
                     if (pos_ > segmentStart) {
@@ -530,27 +429,13 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 // Non-identifier: check if accumulated identifier is a
                 // JS keyword that enables regex position (return, typeof, etc.)
                 if (!lastIdentifier_.empty()) {
-                    lastWasRegexKeyword_ =
-                        lastIdentifier_ == "return" || lastIdentifier_ == "typeof" ||
-                        lastIdentifier_ == "delete" || lastIdentifier_ == "void" ||
-                        lastIdentifier_ == "throw" || lastIdentifier_ == "new" ||
-                        lastIdentifier_ == "in" || lastIdentifier_ == "instanceof" ||
-                        lastIdentifier_ == "case" || lastIdentifier_ == "yield";
+                    lastWasRegexKeyword_ = detail::isRegexEnablingKeyword(
+                        lastIdentifier_.data(), lastIdentifier_.size());
                     lastIdentifier_.clear();
                 } else {
                     lastWasRegexKeyword_ = false;
                 }
-                switch (c) {
-                    case '+': case '-': case '*': case '%':
-                    case '<': case '>': case '=': case '!':
-                    case '&': case '|': case '^': case '~':
-                    case '?': case ':':
-                        lastWasOperator_ = true;
-                        break;
-                    default:
-                        lastWasOperator_ = false;
-                        break;
-                }
+                lastWasOperator_ = detail::isRegexPrefixPunctuator(c);
                 lastSignificantChar_ = c;
             }
 

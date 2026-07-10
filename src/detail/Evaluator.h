@@ -1,7 +1,7 @@
 #pragma once
 #include "AST.h"
-#include "CCEnvironment.h"
-#include "CCError.h"
+#include "jscriptcc/CCEnvironment.h"
+#include "jscriptcc/CCError.h"
 
 namespace jscriptcc {
 

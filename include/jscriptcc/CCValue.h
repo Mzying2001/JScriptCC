@@ -1,8 +1,5 @@
 #pragma once
 #include <string>
-#include <cmath>
-#include <climits>
-#include <limits>
 
 namespace jscriptcc {
 
@@ -12,23 +9,10 @@ class CCValue {
 public:
     enum class Type { Number, String, Bool, Undefined };
 
-    CCValue() : type_(Type::Undefined), num_(0), bool_(false) {}
-    CCValue(double n) : type_(Type::Number), num_(n), bool_(n != 0) {}
-    CCValue(const std::string& s)
-        : type_(Type::String), num_(std::numeric_limits<double>::quiet_NaN()), bool_(false), str_(s) {
-        const char* begin = s.c_str();
-        while (*begin != '\0' && std::isspace(static_cast<unsigned char>(*begin))) ++begin;
-        if (*begin == '\0') {
-            num_ = 0.0;
-            return;
-        }
-
-        char* end = nullptr;
-        double d = std::strtod(begin, &end);
-        while (end && *end != '\0' && std::isspace(static_cast<unsigned char>(*end))) ++end;
-        if (end != begin && end && *end == '\0') num_ = d;
-    }
-    CCValue(bool b) : type_(Type::Bool), num_(b ? 1 : 0), bool_(b) {}
+    CCValue();
+    CCValue(double number);
+    CCValue(const std::string& string);
+    CCValue(bool boolean);
 
     Type type() const { return type_; }
     bool isUndefined() const { return type_ == Type::Undefined; }
@@ -36,48 +20,9 @@ public:
     bool isString() const { return type_ == Type::String; }
     bool isBool() const { return type_ == Type::Bool; }
 
-    double toNumber() const {
-        switch (type_) {
-            case Type::Number: return num_;
-            case Type::Bool: return bool_ ? 1.0 : 0.0;
-            case Type::String: return num_; // pre-computed in constructor
-            case Type::Undefined: return std::numeric_limits<double>::quiet_NaN();
-        }
-        return 0;
-    }
-
-    bool toBool() const {
-        switch (type_) {
-            case Type::Bool: return bool_;
-            case Type::Number: return num_ != 0 && !std::isnan(num_);
-            case Type::String: return !str_.empty();
-            case Type::Undefined: return false;
-        }
-        return false;
-    }
-
-    std::string toString() const {
-        switch (type_) {
-            case Type::String: return str_;
-            case Type::Bool: return bool_ ? "true" : "false";
-            case Type::Number: {
-                // Safely check if the number is an integer without UB.
-                // static_cast<int> is undefined when the value is out of int range,
-                // so we range-check first using doubles (which can represent INT_MIN/INT_MAX).
-                if (!std::isnan(num_) && !std::isinf(num_) &&
-                    num_ >= static_cast<double>(INT_MIN) &&
-                    num_ <= static_cast<double>(INT_MAX)) {
-                    int i = static_cast<int>(num_);
-                    if (static_cast<double>(i) == num_) {
-                        return std::to_string(i);
-                    }
-                }
-                return std::to_string(num_);
-            }
-            case Type::Undefined: return "undefined";
-        }
-        return "";
-    }
+    double toNumber() const;
+    bool toBool() const;
+    std::string toString() const;
 
     const std::string& str() const { return str_; }
 
