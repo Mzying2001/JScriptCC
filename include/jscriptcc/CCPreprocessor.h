@@ -1,6 +1,5 @@
 #pragma once
 #include <string>
-#include <vector>
 #include "CCEnvironment.h"
 #include "CCError.h"
 
@@ -17,7 +16,7 @@ public:
         const std::string& source,
         std::string& output,
         const CCEnvironment& env = CCEnvironment(),
-        std::vector<CCError>* errors = nullptr);
+        CCErrorList* errors = nullptr);
 
     /// Process with explicit data pointer and size.
     bool process(
@@ -25,7 +24,7 @@ public:
         std::size_t size,
         std::string& output,
         const CCEnvironment& env = CCEnvironment(),
-        std::vector<CCError>* errors = nullptr);
+        CCErrorList* errors = nullptr);
 };
 
 } // namespace jscriptcc

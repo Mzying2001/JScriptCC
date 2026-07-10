@@ -8,7 +8,7 @@ bool CCPreprocessor::process(
     const std::string& source,
     std::string& output,
     const CCEnvironment& env,
-    std::vector<CCError>* errors)
+    CCErrorList* errors)
 {
     return process(source.data(), source.size(), output, env, errors);
 }
@@ -18,7 +18,7 @@ bool CCPreprocessor::process(
     std::size_t size,
     std::string& output,
     const CCEnvironment& env,
-    std::vector<CCError>* errors)
+    CCErrorList* errors)
 {
     CCErrorList localErrors;
     CCErrorList* errPtr = errors ? errors : &localErrors;

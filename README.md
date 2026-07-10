@@ -70,7 +70,7 @@ public:
         const std::string& source,
         std::string& output,
         const CCEnvironment& env = CCEnvironment(),
-        std::vector<CCError>* errors = nullptr);
+        CCErrorList* errors = nullptr);
 };
 ```
 
