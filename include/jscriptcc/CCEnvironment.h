@@ -14,14 +14,15 @@ enum class TargetArchitecture {
 class CCEnvironment {
 public:
     explicit CCEnvironment(TargetArchitecture architecture = TargetArchitecture::Win32);
-    void setDefaults();
 
     const CCValue* find(const std::string& name) const;
     void set(const std::string& name, const CCValue& value);
 
 private:
+    void initializeDefaults();
+
     TargetArchitecture architecture_;
-    std::unordered_map<std::string, CCValue> variables;
+    std::unordered_map<std::string, CCValue> variables_;
 };
 
 } // namespace jscriptcc
