@@ -805,19 +805,16 @@ TEST(set_without_if) {
 
 // ── Test: Undefined variable ─────────────────────────────────────────────────
 
-TEST(undefined_variable_is_zero) {
+TEST(undefined_variable_is_false_but_not_zero) {
     std::string src =
         "/*@cc_on\n"
-        "@if(@UNDEFINED_VAR)\n"
-        "alert('yes');\n"
-        "@else\n"
-        "alert('no');\n"
+        "@if(!@UNDEFINED_VAR && @UNDEFINED_VAR != 0 && @UNDEFINED_VAR != false)\n"
+        "alert('undefined');\n"
         "@end\n"
         "@*/\n";
 
     std::string out = process(src);
-    ASSERT_TRUE(out.find("alert('no');") != std::string::npos);
-    ASSERT_FALSE(out.find("alert('yes');") != std::string::npos);
+    ASSERT_TRUE(out.find("alert('undefined');") != std::string::npos);
 }
 
 // ── Test: Negative numbers ───────────────────────────────────────────────────

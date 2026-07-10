@@ -217,8 +217,7 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
             std::string name = node.valueText.toString();
             const CCValue* val = env_->find(name);
             if (val) return *val;
-            // Undefined variable — return 0 (JScript behavior)
-            return CCValue(0.0);
+            return CCValue();
         }
 
         // Unary operators
