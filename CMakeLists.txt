@@ -41,6 +41,15 @@ target_include_directories(jscriptcc PRIVATE src)
 
 # Tests
 enable_testing()
-add_executable(jscriptcc_tests tests/main.cpp)
+add_executable(jscriptcc_tests
+    tests/main.cpp
+    tests/TestFramework.cpp
+    tests/test_preprocessor.cpp
+    tests/test_scanner.cpp
+    tests/test_expressions.cpp
+    tests/test_environment.cpp
+    tests/test_errors.cpp
+    tests/test_regressions.cpp
+)
 target_link_libraries(jscriptcc_tests jscriptcc)
 add_test(NAME jscriptcc_tests COMMAND jscriptcc_tests)

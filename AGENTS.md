@@ -57,7 +57,8 @@ src/
     (library implementation files)
 
 tests/
-    main.cpp            # Self-contained test suite (no third-party deps)
+    TestFramework.*     # Self-contained test registration and runner support
+    test_*.cpp          # Tests grouped by responsibility
 ```
 
 ## Architecture
