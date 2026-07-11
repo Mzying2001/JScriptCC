@@ -184,7 +184,6 @@ void Evaluator::evalStatement(const ASTNode& node, std::string& output) {
 void Evaluator::evalIf(const IfNode& node, std::string& output) {
     for (const auto& branch : node.branches) {
         if (!branch.condition) {
-            // @else branch — always taken if we reach it
             for (const auto& stmt : branch.body) {
                 evalStatement(*stmt, output);
             }
@@ -199,7 +198,6 @@ void Evaluator::evalIf(const IfNode& node, std::string& output) {
             return;
         }
     }
-    // No branch matched — output nothing
 }
 
 void Evaluator::evalSet(const SetNode& node) {
@@ -220,10 +218,8 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
         // Literals
         case ExprType::NumberLiteral: {
             const std::string& s = node.valueText.toString();
-            // Check for true/false
             if (s == "true") return CCValue(true);
             if (s == "false") return CCValue(false);
-            // Check for hex
             if (s.size() > 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
                 long v = std::strtol(s.c_str(), nullptr, 16);
                 return CCValue(static_cast<double>(v));
@@ -398,8 +394,6 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
         }
 
         case ExprType::Conditional: {
-            // Ternary: condition ? trueExpr : falseExpr
-            // Not supported in this implementation (JScript CC doesn't have ternary)
             if (evalExpr(*node.left).toBool()) {
                 return evalExpr(*node.right);
             }

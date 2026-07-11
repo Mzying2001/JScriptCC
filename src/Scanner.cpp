@@ -34,8 +34,6 @@ void Scanner::advanceLine() {
 }
 
 void Scanner::skipQuotedString(char quote) {
-    // Called after the opening quote is consumed.
-    // Advances past the closing quote.
     while (pos_ < size_) {
         if (data_[pos_] == '\\') {
             adv();
@@ -54,8 +52,6 @@ void Scanner::skipQuotedString(char quote) {
 }
 
 void Scanner::skipTemplateExpression() {
-    // Called after the opening '{' of ${...} is consumed.
-    // Advances past the matching '}'.
     int depth = 1;
     bool regexAllowed = true;
     while (pos_ < size_ && depth > 0) {
@@ -122,8 +118,6 @@ void Scanner::skipTemplateExpression() {
 }
 
 void Scanner::skipTemplateString() {
-    // Called after the opening backtick is consumed.
-    // Advances past the closing backtick.
     while (pos_ < size_) {
         if (data_[pos_] == '\\') {
             adv();
@@ -145,13 +139,10 @@ void Scanner::skipTemplateString() {
 }
 
 void Scanner::skipLineComment() {
-    // Advances past the newline (or to end of source).
     while (pos_ < size_ && data_[pos_] != '\n') adv();
 }
 
 void Scanner::skipBlockComment() {
-    // Called after the opening /* is consumed.
-    // Advances past the closing */.
     while (pos_ < size_) {
         if (data_[pos_] == '*' && pos_ + 1 < size_ && data_[pos_ + 1] == '/') {
             adv(); adv();
@@ -163,8 +154,6 @@ void Scanner::skipBlockComment() {
 }
 
 void Scanner::skipRegexLiteral() {
-    // Called after the opening / is consumed.
-    // Advances past the closing / and any flags.
     while (pos_ < size_) {
         if (data_[pos_] == '\\') {
             adv();
@@ -184,7 +173,6 @@ void Scanner::skipRegexLiteral() {
             adv();
         }
     }
-    // Skip regex flags
     while (pos_ < size_ && std::isalpha(static_cast<unsigned char>(data_[pos_]))) adv();
 }
 
@@ -222,7 +210,7 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
 
         // ── Default state ────────────────────────────────────────────────
         case State::Default: {
-            // Single-quote string
+            // JavaScript string and template literals.
             if (c == '\'') {
                 lastSignificantChar_ = c;
                 lastWasOperator_ = false;
@@ -232,7 +220,6 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 skipQuotedString('\'');
                 continue;
             }
-            // Double-quote string
             if (c == '"') {
                 lastSignificantChar_ = c;
                 lastWasOperator_ = false;
@@ -242,7 +229,6 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 skipQuotedString('"');
                 continue;
             }
-            // Template string
             if (c == '`') {
                 lastSignificantChar_ = c;
                 lastWasOperator_ = false;
@@ -253,7 +239,7 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 continue;
             }
 
-            // Line comment
+            // Line comments and the //@cc_on activation directive.
             if (c == '/' && pos_ + 1 < size_ && data_[pos_ + 1] == '/') {
                 // Check for //@cc_on (must be immediately after //, no spaces)
                 std::size_t lookPos = pos_ + 2;
@@ -266,7 +252,6 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                     if (pos_ > segmentStart) {
                         emitSegment(SegmentType::NormalJS, segmentStart, pos_);
                     }
-                    // Find end of line
                     std::size_t lineEnd = pos_;
                     while (lineEnd < size_ && data_[lineEnd] != '\n') ++lineEnd;
                     if (lineEnd < size_ && data_[lineEnd] == '\n') ++lineEnd;
@@ -276,46 +261,35 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                     advanceLine();
                     segmentStart = pos_;
 
-                    // Now scan the rest of the source for @ directives.
-                    // Everything between directives is normal JS.
-                    // We need to track strings/comments to avoid false matches.
+                    // Search for directives while ignoring JS literals and comments.
                     while (pos_ < size_) {
                         c = data_[pos_];
 
-                        // Skip strings
                         if (c == '\'' || c == '"') {
                             adv();
                             skipQuotedString(c);
                             continue;
                         }
-                        // Skip template strings
                         if (c == '`') {
                             adv();
                             skipTemplateString();
                             continue;
                         }
-                        // Skip line comments
                         if (c == '/' && pos_ + 1 < size_ && data_[pos_ + 1] == '/') {
                             skipLineComment();
                             continue;
                         }
-                        // Skip block comments
                         if (c == '/' && pos_ + 1 < size_ && data_[pos_ + 1] == '*') {
                             adv(); adv();
                             skipBlockComment();
                             continue;
                         }
-                        // Skip regex literals
                         if (c == '/') {
-                            // Determine if this is a regex or division operator.
-                            // After an identifier that is NOT a regex-enabling keyword
-                            // (return, typeof, delete, void, throw, new, in, instanceof,
-                            // case, yield), or after ) or ], it's division.
+                            // A slash immediately after a non-keyword identifier, ')' or ']' is division.
                             bool isRegex = true;
                             if (pos_ > 0) {
                                 char prev = data_[pos_ - 1];
                                 if (detail::isJSIdentifierChar(prev) || prev == ')' || prev == ']') {
-                                    // Check if the preceding identifier is a regex keyword
                                     std::size_t identEnd = pos_;
                                     std::size_t identStart = identEnd;
                                     while (identStart > 0 && detail::isJSIdentifierChar(data_[identStart - 1])) {
@@ -326,32 +300,27 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                                         const char* p = data_ + identStart;
                                         isRegex = detail::isRegexEnablingKeyword(p, len);
                                     } else {
-                                        // prev is ) or ] — division
                                         isRegex = false;
                                     }
                                 }
                             }
                             if (isRegex) {
-                                adv(); // skip /
+                                adv();
                                 skipRegexLiteral();
                                 continue;
                             }
                         }
 
-                        // Check for @if, @elif, @else, @end, @set
                         if (c == '@') {
                             detail::CCDirective directive = detail::matchCCDirective(data_, size_, pos_);
                             bool isDirective = directive != detail::CCDirective::None &&
                                                directive != detail::CCDirective::CCOn;
 
                             if (isDirective) {
-                                // Emit any preceding normal JS
                                 if (pos_ > segmentStart) {
                                     emitSegment(SegmentType::NormalJS, segmentStart, pos_);
                                 }
-                                // Conditional compilation remains active after
-                                // //@cc_on, so Tokenizer processes the source from
-                                // the first real directive through end of input.
+                                // //@cc_on keeps CC active through the end of the source.
                                 emitSegment(SegmentType::CCBlock, pos_, size_);
                                 pos_ = size_;
                                 segmentStart = pos_;
@@ -363,21 +332,17 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                         adv();
                     }
 
-                    // If we get here, no directives were found after //@cc_on
-                    // The rest is just normal JS with CC active but no directives.
-                    // Emit as normal JS.
                     if (pos_ > segmentStart) {
                         emitSegment(SegmentType::NormalJS, segmentStart, pos_);
                         segmentStart = pos_;
                     }
                     goto done_scan;
                 }
-                // Regular line comment — skip to end
                 skipLineComment();
                 continue;
             }
 
-            // Block comment
+            // Block comments and embedded CC blocks.
             if (c == '/' && pos_ + 1 < size_ && data_[pos_ + 1] == '*') {
                 // Check for /*@cc_on or /*@directive (must be immediately after /*, no spaces)
                 std::size_t lookPos = pos_ + 2;
@@ -391,29 +356,28 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                     }
                     ccBlockStart = pos_;
                     state = State::CCBlock;
-                    adv(); adv(); // skip /*
+                    adv(); adv();
                     continue;
                 }
-                // Regular block comment
-                adv(); adv(); // skip /*
+                adv(); adv();
                 skipBlockComment();
                 continue;
             }
 
-            // Regex literal
+            // Regex literals.
             if (c == '/' && isRegexPosition()) {
                 lastSignificantChar_ = '/';
                 lastWasOperator_ = false;
                 lastWasRegexKeyword_ = false;
                 lastIdentifier_.clear();
-                adv(); // skip /
+                adv();
                 skipRegexLiteral();
                 continue;
             }
 
             // Track significant characters
             if (c == ' ' || c == '\t' || c == '\r') {
-                // skip
+                // Ignore horizontal whitespace.
             } else if (c == '\n') {
                 advanceLine();
                 lastSignificantChar_ = '\n';
@@ -421,13 +385,11 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 lastWasRegexKeyword_ = false;
                 lastIdentifier_.clear();
             } else if (std::isalpha(static_cast<unsigned char>(c)) || c == '_' || c == '$') {
-                // Accumulate identifier characters
                 lastIdentifier_.push_back(c);
                 lastWasOperator_ = false;
                 lastSignificantChar_ = c;
             } else {
-                // Non-identifier: check if accumulated identifier is a
-                // JS keyword that enables regex position (return, typeof, etc.)
+                // Keywords such as return allow a regex literal to follow.
                 if (!lastIdentifier_.empty()) {
                     lastWasRegexKeyword_ = detail::isRegexEnablingKeyword(
                         lastIdentifier_.data(), lastIdentifier_.size());
@@ -455,21 +417,19 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
                 skipTemplateString();
                 continue;
             }
-            // Closing @*/
+            // End of the current CC block.
             if (c == '@' && pos_ + 2 < size_ && data_[pos_ + 1] == '*' && data_[pos_ + 2] == '/') {
-                adv(); adv(); adv(); // skip @*/
+                adv(); adv(); adv();
                 emitSegment(SegmentType::CCBlock, ccBlockStart, pos_);
                 segmentStart = pos_;
                 state = State::Default;
                 continue;
             }
-            // Nested block comment
             if (c == '/' && pos_ + 1 < size_ && data_[pos_ + 1] == '*') {
                 state = State::CCBlockBlockComment;
                 adv(); adv();
                 continue;
             }
-            // Line comment inside CC
             if (c == '/' && pos_ + 1 < size_ && data_[pos_ + 1] == '/') {
                 state = State::CCBlockLineComment;
                 adv(); adv();
@@ -510,7 +470,6 @@ bool Scanner::scan(const char* data, std::size_t size, CCErrorList* errors) {
 
 done_scan:
 
-    // Handle unterminated states
     switch (state) {
         case State::CCBlock:
         case State::CCBlockBlockComment:
@@ -523,7 +482,6 @@ done_scan:
             break;
     }
 
-    // Emit any remaining normal JS
     if (segmentStart < size_) {
         emitSegment(SegmentType::NormalJS, segmentStart, size_);
     }

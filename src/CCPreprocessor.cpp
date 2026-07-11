@@ -30,15 +30,15 @@ bool CCPreprocessor::process(
         return false;
     }
 
-    // Step 1: Scan source to identify CC blocks
+    // Identify conditional compilation blocks.
     Scanner scanner;
     if (!scanner.scan(data, size, errPtr)) {
         output.assign(data, size);
         return false;
     }
 
-    // Step 2: Generate output
-    CCEnvironment mutableEnv = env; // copy so @set can modify it
+    // Generate output from the scanned segments.
+    CCEnvironment mutableEnv = env;
     Generator generator;
     if (!generator.generate(data, size, scanner.segments(), mutableEnv, output, errPtr)) {
         output.assign(data, size);
