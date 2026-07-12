@@ -30,7 +30,7 @@ static bool parseHex4(
     return true;
 }
 
-static void appendUtf8(std::string& output, unsigned int codePoint) {
+static void appendWtf8CodePoint(std::string& output, unsigned int codePoint) {
     if (codePoint <= 0x7f) {
         output.push_back(static_cast<char>(codePoint));
     } else if (codePoint <= 0x7ff) {
@@ -107,7 +107,7 @@ static std::string decodeStringLiteral(const StringSlice& text) {
                             i += 6;
                         }
                     }
-                    appendUtf8(result, codePoint);
+                    appendWtf8CodePoint(result, codePoint);
                     break;
                 }
                 result.push_back('u');
