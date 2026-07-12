@@ -2,7 +2,7 @@ cmake_minimum_required(VERSION 3.10)
 
 project(
     JScriptCC
-    VERSION 1.1.0
+    VERSION 1.2.0
     DESCRIPTION "JScript conditional compilation preprocessor"
     LANGUAGES CXX
 )
@@ -22,6 +22,7 @@ set(LIB_SOURCES
     src/Generator.cpp
     src/CCPreprocessor.cpp
     src/CCEnvironment.cpp
+    src/UnicodeConversion.cpp
 )
 
 add_library(jscriptcc STATIC ${LIB_SOURCES})
@@ -47,6 +48,7 @@ add_executable(jscriptcc_tests
     tests/cases/test_environment.cpp
     tests/cases/test_errors.cpp
     tests/cases/test_regressions.cpp
+    tests/cases/test_wide_api.cpp
 )
 target_link_libraries(jscriptcc_tests jscriptcc)
 target_include_directories(jscriptcc_tests PRIVATE tests)

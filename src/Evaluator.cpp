@@ -14,14 +14,35 @@ static int hexValue(char c) {
     return -1;
 }
 
-static void appendUtf8(std::string& output, unsigned int codePoint) {
+static bool parseHex4(
+    const std::string& text,
+    std::size_t start,
+    std::size_t end,
+    unsigned int& value) {
+    if (start > end || end - start < 4)
+        return false;
+    value = 0;
+    for (std::size_t i = start; i < start + 4; ++i) {
+        int digit = hexValue(text[i]);
+        if (digit < 0) return false;
+        value = (value << 4) | static_cast<unsigned int>(digit);
+    }
+    return true;
+}
+
+static void appendWtf8CodePoint(std::string& output, unsigned int codePoint) {
     if (codePoint <= 0x7f) {
         output.push_back(static_cast<char>(codePoint));
     } else if (codePoint <= 0x7ff) {
         output.push_back(static_cast<char>(0xc0 | (codePoint >> 6)));
         output.push_back(static_cast<char>(0x80 | (codePoint & 0x3f)));
-    } else {
+    } else if (codePoint <= 0xffff) {
         output.push_back(static_cast<char>(0xe0 | (codePoint >> 12)));
+        output.push_back(static_cast<char>(0x80 | ((codePoint >> 6) & 0x3f)));
+        output.push_back(static_cast<char>(0x80 | (codePoint & 0x3f)));
+    } else if (codePoint <= 0x10ffff) {
+        output.push_back(static_cast<char>(0xf0 | (codePoint >> 18)));
+        output.push_back(static_cast<char>(0x80 | ((codePoint >> 12) & 0x3f)));
         output.push_back(static_cast<char>(0x80 | ((codePoint >> 6) & 0x3f)));
         output.push_back(static_cast<char>(0x80 | (codePoint & 0x3f)));
     }
@@ -71,22 +92,23 @@ static std::string decodeStringLiteral(const StringSlice& text) {
                 break;
             }
             case 'u': {
-                if (i + 4 < raw.size() - 1) {
-                    unsigned int codePoint = 0;
-                    bool valid = true;
-                    for (int digit = 1; digit <= 4; ++digit) {
-                        int value = hexValue(raw[i + digit]);
-                        if (value < 0) {
-                            valid = false;
-                            break;
+                const std::size_t contentEnd = raw.size() - 1;
+                unsigned int codePoint = 0;
+                if (parseHex4(raw, i + 1, contentEnd, codePoint)) {
+                    i += 4;
+                    if (codePoint >= 0xd800 && codePoint <= 0xdbff &&
+                        i + 2 < contentEnd && raw[i + 1] == '\\' && raw[i + 2] == 'u') {
+                        unsigned int lowSurrogate = 0;
+                        if (parseHex4(raw, i + 3, contentEnd, lowSurrogate) &&
+                            lowSurrogate >= 0xdc00 && lowSurrogate <= 0xdfff) {
+                            codePoint = 0x10000 +
+                                ((codePoint - 0xd800) << 10) +
+                                (lowSurrogate - 0xdc00);
+                            i += 6;
                         }
-                        codePoint = (codePoint << 4) | static_cast<unsigned int>(value);
                     }
-                    if (valid) {
-                        appendUtf8(result, codePoint);
-                        i += 4;
-                        break;
-                    }
+                    appendWtf8CodePoint(result, codePoint);
+                    break;
                 }
                 result.push_back('u');
                 break;
@@ -162,7 +184,6 @@ void Evaluator::evalStatement(const ASTNode& node, std::string& output) {
 void Evaluator::evalIf(const IfNode& node, std::string& output) {
     for (const auto& branch : node.branches) {
         if (!branch.condition) {
-            // @else branch — always taken if we reach it
             for (const auto& stmt : branch.body) {
                 evalStatement(*stmt, output);
             }
@@ -177,7 +198,6 @@ void Evaluator::evalIf(const IfNode& node, std::string& output) {
             return;
         }
     }
-    // No branch matched — output nothing
 }
 
 void Evaluator::evalSet(const SetNode& node) {
@@ -198,10 +218,8 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
         // Literals
         case ExprType::NumberLiteral: {
             const std::string& s = node.valueText.toString();
-            // Check for true/false
             if (s == "true") return CCValue(true);
             if (s == "false") return CCValue(false);
-            // Check for hex
             if (s.size() > 2 && s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
                 long v = std::strtol(s.c_str(), nullptr, 16);
                 return CCValue(static_cast<double>(v));
@@ -376,8 +394,6 @@ CCValue Evaluator::evalExpr(const ExprNode& node) {
         }
 
         case ExprType::Conditional: {
-            // Ternary: condition ? trueExpr : falseExpr
-            // Not supported in this implementation (JScript CC doesn't have ternary)
             if (evalExpr(*node.left).toBool()) {
                 return evalExpr(*node.right);
             }

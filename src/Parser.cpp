@@ -111,7 +111,7 @@ ASTNodePtr Parser::parseStatement() {
         return nullptr;
     }
     if (check(TokenType::ELIF) || check(TokenType::ELSE) || check(TokenType::END)) {
-        // These are handled by parseIf, seeing them here means they're orphaned
+        // Branch directives are only valid within parseIf().
         addError(current(), "Unexpected " + current().text.toString());
         advance();
         return nullptr;
@@ -122,13 +122,12 @@ ASTNodePtr Parser::parseStatement() {
 std::unique_ptr<IfNode> Parser::parseIf() {
     auto ifNode = std::unique_ptr<IfNode>(new IfNode());
 
-    // Parse @if
-    advance(); // consume @if
+    // Parse the @if branch.
+    advance();
     {
         Branch branch;
         branch.condition = parseBranchCondition("@if");
 
-        // Parse body (everything until @elif, @else, @end)
         while (!atEnd() && !check(TokenType::ELIF) && !check(TokenType::ELSE) &&
                !check(TokenType::END)) {
             auto stmt = parseStatement();
@@ -138,9 +137,9 @@ std::unique_ptr<IfNode> Parser::parseIf() {
         ifNode->branches.push_back(std::move(branch));
     }
 
-    // Parse @elif branches
+    // Parse any @elif branches.
     while (check(TokenType::ELIF)) {
-        advance(); // consume @elif
+        advance();
         Branch branch;
         branch.condition = parseBranchCondition("@elif");
 
@@ -153,11 +152,10 @@ std::unique_ptr<IfNode> Parser::parseIf() {
         ifNode->branches.push_back(std::move(branch));
     }
 
-    // Parse @else
+    // Parse the optional @else branch.
     if (check(TokenType::ELSE)) {
-        advance(); // consume @else
+        advance();
         Branch branch;
-        // No condition for @else
 
         while (!atEnd() && !check(TokenType::END)) {
             auto stmt = parseStatement();
@@ -167,9 +165,9 @@ std::unique_ptr<IfNode> Parser::parseIf() {
         ifNode->branches.push_back(std::move(branch));
     }
 
-    // Expect @end
+    // Require the closing @end.
     if (check(TokenType::END)) {
-        advance(); // consume @end
+        advance();
     } else {
         addError(current(), "Expected @end to close @if block");
     }
@@ -203,10 +201,10 @@ ExprNodePtr Parser::parseBranchCondition(const char* directiveName) {
 
 std::unique_ptr<SetNode> Parser::parseSet() {
     auto setNode = std::unique_ptr<SetNode>(new SetNode());
-    advance(); // consume @set
+    advance();
     skipWhitespace();
 
-    // Expect identifier (variable name, may start with @)
+    // Parse the variable name and assignment.
     if (check(TokenType::IDENTIFIER)) {
         setNode->varName = current().text;
         advance();
@@ -217,7 +215,6 @@ std::unique_ptr<SetNode> Parser::parseSet() {
 
     skipWhitespace();
 
-    // Expect =
     if (check(TokenType::ASSIGN)) {
         advance();
         skipWhitespace();
@@ -226,15 +223,14 @@ std::unique_ptr<SetNode> Parser::parseSet() {
         return setNode;
     }
 
-    // Parse expression
+    // Parse the assigned expression.
     setNode->value = parseExpression();
 
     return setNode;
 }
 
 ASTNodePtr Parser::parseText() {
-    // Collect consecutive text tokens and newlines
-    // If we encounter a directive, stop
+    // Preserve text up to the next directive.
     auto textNode = std::unique_ptr<TextNode>(new TextNode());
     const char* start = current().text.begin();
     const char* end = start;
@@ -280,12 +276,11 @@ int Parser::getPrecedence(TokenType type) const {
         case TokenType::STAR:
         case TokenType::SLASH:
         case TokenType::PERCENT:  return 11;
-        default:                  return -1; // not a binary operator
+        default:                  return -1;
     }
 }
 
 bool Parser::isRightAssociative(TokenType /*type*/) const {
-    // None of the CC operators are right-associative
     return false;
 }
 
@@ -309,7 +304,7 @@ ExprType Parser::tokenToBinaryExprType(TokenType type) const {
         case TokenType::BITOR:    return ExprType::BitOr;
         case TokenType::AND:      return ExprType::LogAnd;
         case TokenType::OR:       return ExprType::LogOr;
-        default:                  return ExprType::NumberLiteral; // shouldn't happen
+        default:                  return ExprType::NumberLiteral;
     }
 }
 
@@ -383,12 +378,12 @@ ExprNodePtr Parser::parsePrimary() {
 
     switch (tok.type) {
         case TokenType::LPAREN: {
-            advance(); // (
+            advance();
             auto expr = parseExpression();
             if (!check(TokenType::RPAREN)) {
                 addError(current(), "Expected ')' in expression");
             } else {
-                advance(); // )
+                advance();
             }
             return expr;
         }
@@ -416,7 +411,7 @@ ExprNodePtr Parser::parsePrimary() {
 
         default:
             addError(tok, "Expected expression");
-            advance(); // skip the unexpected token
+            advance();
             auto node = ExprNode::make(ExprType::NumberLiteral);
             node->valueText = StringSlice("0", 1);
             return node;

@@ -15,7 +15,7 @@ bool Generator::generate(
 {
     errors_ = errors;
     output.clear();
-    output.reserve(sourceSize); // reasonable estimate
+    output.reserve(sourceSize);
 
     std::size_t errorCount = errors_ ? errors_->size() : 0;
     std::size_t sourcePosition = 0;
@@ -35,30 +35,23 @@ bool Generator::generate(
 
         switch (seg.type) {
             case SegmentType::NormalJS: {
-                // Copy normal JS verbatim
+                // Preserve normal JavaScript verbatim.
                 output.append(sourceData + seg.begin, seg.end - seg.begin);
                 break;
             }
 
             case SegmentType::CCBlock: {
-                // Process /*@cc_on ... @*/
+                // Process a conditional compilation block.
                 processCCBlock(
                     sourceData, seg.begin, seg.end, sourceLine, sourceColumn, env, output);
                 break;
             }
 
             case SegmentType::CCOnLine: {
-                // //@cc_on line — output as a comment (it's a line comment)
-                // Actually, in the output we should just remove the //@cc_on line
-                // since it's a CC directive. But we could also preserve it as a
-                // comment. Let's remove it (the user wants clean JS output).
-                // But wait — the @cc_on line itself should not appear in output.
-                // The subsequent CC block was already processed.
-                // So we just skip this segment.
+                // Omit the activation directive from generated output.
                 break;
             }
         }
-
 
         while (sourcePosition < seg.end) {
             if (sourceData[sourcePosition] == '\n') {
@@ -71,7 +64,6 @@ bool Generator::generate(
         }
     }
 
-    // Return false if any errors were added during processing
     return !errors_ || errors_->size() == errorCount;
 }
 
@@ -84,21 +76,15 @@ void Generator::processCCBlock(
     CCEnvironment& env,
     std::string& output)
 {
-    // The block includes /*@cc_on ... @*/
-    // We need to extract the content between /*@cc_on and @*/
-    // But the content may have already been identified by the scanner.
-
-    // Find the actual CC content: skip /*@cc_on and the newline after it,
-    // stop before @*/
+    // Strip the block delimiters and an optional @cc_on marker.
     std::size_t contentBegin = blockBegin;
     std::size_t contentEnd = blockEnd;
     int contentLine = blockLine;
     int contentColumn = blockColumn;
 
-    // Skip /*@cc_on (or /*@directive) and the newline after it
     if (contentBegin + 2 < blockEnd &&
         blockData[contentBegin] == '/' && blockData[contentBegin + 1] == '*') {
-        contentBegin += 2; // skip /*
+        contentBegin += 2;
         contentColumn += 2;
         const char* p = blockData + contentBegin;
         const char* end = blockData + contentEnd;
@@ -111,24 +97,19 @@ void Generator::processCCBlock(
             }
             ++p;
         };
-        // Skip whitespace before @cc_on
         while (p < end && (*p == ' ' || *p == '\t')) advanceContent();
-        // Skip @cc_on
         if (p + 6 <= end && std::memcmp(p, "@cc_on", 6) == 0) {
             for (int i = 0; i < 6; ++i) advanceContent();
         } else {
-            // Skip directive keyword (@if, @elif, @else, @end, @set)
             while (p < end && (std::isalnum(static_cast<unsigned char>(*p)) || *p == '_')) {
                 advanceContent();
             }
         }
-        // Skip whitespace and newline after @cc_on / directive
         while (p < end && (*p == ' ' || *p == '\t' || *p == '\r')) advanceContent();
         if (p < end && *p == '\n') advanceContent();
         contentBegin = static_cast<std::size_t>(p - blockData);
     }
 
-    // Find @*/ at the end
     if (contentEnd >= 3 &&
         blockData[contentEnd - 3] == '@' &&
         blockData[contentEnd - 2] == '*' &&
@@ -148,24 +129,22 @@ void Generator::processCCBlock(
         --contentEnd;
     }
 
-    if (contentBegin >= contentEnd) return; // empty CC block
+    if (contentBegin >= contentEnd) return;
 
-    // Tokenize the CC content
     std::size_t contentSize = contentEnd - contentBegin;
     const char* contentData = blockData + contentBegin;
 
+    // Tokenize and parse the CC content.
     Tokenizer tokenizer;
     tokenizer.tokenize(contentData, contentSize, errors_, contentLine, contentColumn);
 
-    // Parse
     Parser parser;
     auto ast = parser.parse(tokenizer.tokens(), errors_);
 
-    // Evaluate
+    // Evaluate the selected branch and append its output.
     Evaluator evaluator;
     EvalResult result = evaluator.evaluate(*ast, env, errors_);
 
-    // Append evaluated output
     if (result.hasOutput) {
         output.append(result.outputText);
     }

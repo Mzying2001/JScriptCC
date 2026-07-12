@@ -113,6 +113,37 @@ TEST(string_literals_decode_escapes) {
     ASSERT_TRUE(out.find("alert('decoded');") != std::string::npos);
 }
 
+TEST(string_literals_decode_surrogate_pairs_as_utf8) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if('\\uD800\\uDC00' == '";
+    src.append("\xf0\x90\x80\x80", 4);
+    src += "' && '\\uD83D\\uDE00' == '";
+    src.append("\xf0\x9f\x98\x80", 4);
+    src += "' && '\\uDBFF\\uDFFF' == '";
+    src.append("\xf4\x8f\xbf\xbf", 4);
+    src +=
+        "')\n"
+        "alert('supplementary');\n"
+        "@end\n"
+        "@*/\n";
+
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('supplementary');") != std::string::npos);
+}
+
+TEST(string_literals_keep_unpaired_surrogates_distinct) {
+    std::string src =
+        "/*@cc_on\n"
+        "@if('\\uD800' != '\\uD801' && '\\uDC00' != '\\uDC01')\n"
+        "alert('distinct');\n"
+        "@end\n"
+        "@*/\n";
+
+    std::string out = process(src);
+    ASSERT_TRUE(out.find("alert('distinct');") != std::string::npos);
+}
+
 TEST(string_relational_comparison_is_lexical) {
     std::string src =
         "/*@cc_on\n"

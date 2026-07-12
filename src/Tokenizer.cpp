@@ -207,7 +207,6 @@ bool Tokenizer::tokenize(
         scanNext();
     }
 
-    // Flush any trailing text
     if (inText_) {
         addToken(TokenType::TEXT, data_ + textStart_, data_ + pos_);
         inText_ = false;
@@ -240,7 +239,7 @@ void Tokenizer::scanNext() {
         return;
     }
 
-    // Newline
+    // Newlines delimit CC statements.
     if (c == '\n') {
         if (inText_) {
             addToken(TokenType::TEXT, data_ + textStart_, data_ + pos_);
@@ -252,7 +251,7 @@ void Tokenizer::scanNext() {
         return;
     }
 
-    // Check for @ directives
+    // CC directives and @-prefixed variables.
     if (c == '@') {
         detail::CCDirective directive = detail::matchCCDirective(data_, size_, pos_);
         if (directive != detail::CCDirective::None) {
@@ -280,15 +279,14 @@ void Tokenizer::scanNext() {
             return;
         }
 
-        // @ followed by identifier (variable like @_win32)
+        // CC variables retain their @ prefix.
         if (pos_ + 1 < size_ && (std::isalpha(static_cast<unsigned char>(data_[pos_ + 1])) || data_[pos_ + 1] == '_')) {
-            // Flush preceding text
             if (inText_) {
                 addToken(TokenType::TEXT, data_ + textStart_, data_ + pos_);
                 inText_ = false;
             }
             const char* start = data_ + pos_;
-            advance(); // skip @
+            advance();
             while (pos_ < size_ && (std::isalnum(static_cast<unsigned char>(peek())) || peek() == '_')) {
                 advance();
             }
@@ -296,28 +294,23 @@ void Tokenizer::scanNext() {
             return;
         }
 
-        // @ followed by something else — treat as text
         beginText();
         advance();
         return;
     }
 
-    // Skip spaces (not newlines) — they're part of text
     if (c == ' ' || c == '\t' || c == '\r') {
         beginText();
         advance();
         return;
     }
 
-    // Check for expression tokens: we need to recognize these within
-    // @if/@elif conditions. But the tokenizer doesn't know the context.
-    // Strategy: always tokenize these, the parser will use them as needed.
+    // Expression tokens are recognized globally because tokenization is context-free.
 
-    // Numbers
+    // Numbers.
     if (std::isdigit(static_cast<unsigned char>(c)) ||
         (c == '.' && pos_ + 1 < size_ && std::isdigit(static_cast<unsigned char>(data_[pos_ + 1]))))
     {
-        // Flush preceding text
         if (inText_) {
             addToken(TokenType::TEXT, data_ + textStart_, data_ + pos_);
             inText_ = false;
@@ -342,9 +335,8 @@ void Tokenizer::scanNext() {
         return;
     }
 
-    // Identifiers (non-@ prefixed)
+    // Identifiers.
     if (std::isalpha(static_cast<unsigned char>(c)) || c == '_') {
-        // Flush preceding text
         if (inText_) {
             addToken(TokenType::TEXT, data_ + textStart_, data_ + pos_);
             inText_ = false;
@@ -353,26 +345,24 @@ void Tokenizer::scanNext() {
         while (pos_ < size_ && (std::isalnum(static_cast<unsigned char>(peek())) || peek() == '_')) {
             advance();
         }
-        // Check for true/false keywords
         StringSlice word(start, data_ + pos_);
         if (word == "true" || word == "false") {
-            addToken(TokenType::NUMBER, start, data_ + pos_); // treat as number (bool value)
+            addToken(TokenType::NUMBER, start, data_ + pos_);
         } else {
             addToken(TokenType::IDENTIFIER, start, data_ + pos_);
         }
         return;
     }
 
-    // Strings
+    // Strings.
     if (c == '\'' || c == '"') {
-        // Flush preceding text
         if (inText_) {
             addToken(TokenType::TEXT, data_ + textStart_, data_ + pos_);
             inText_ = false;
         }
         char quote = c;
         const char* start = data_ + pos_;
-        advance(); // skip opening quote
+        advance();
         while (pos_ < size_ && peek() != quote) {
             if (peek() == '\\') {
                 advance();
@@ -382,13 +372,12 @@ void Tokenizer::scanNext() {
                 advance();
             }
         }
-        if (pos_ < size_) advance(); // skip closing quote
+        if (pos_ < size_) advance();
         addToken(TokenType::STRING, start, data_ + pos_);
         return;
     }
 
-    // Operators and punctuation
-    // Flush preceding text
+    // Operators and punctuation.
     if (inText_) {
         addToken(TokenType::TEXT, data_ + textStart_, data_ + pos_);
         inText_ = false;
@@ -396,7 +385,6 @@ void Tokenizer::scanNext() {
 
     const char* start = data_ + pos_;
 
-    // Two-character operators first
     if (pos_ + 1 < size_) {
         char c1 = c, c2 = data_[pos_ + 1];
         TokenType twoChar = TokenType::TEXT;
@@ -416,7 +404,6 @@ void Tokenizer::scanNext() {
         }
     }
 
-    // Single-character operators
     TokenType singleChar = TokenType::TEXT;
     switch (c) {
         case '(': singleChar = TokenType::LPAREN; break;
@@ -446,7 +433,6 @@ void Tokenizer::scanNext() {
         return;
     }
 
-    // Unknown character — treat as text
     beginText();
     advance();
 }
