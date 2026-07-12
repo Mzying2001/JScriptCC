@@ -64,14 +64,38 @@ public:
         std::string& output,
         const CCEnvironment& env = CCEnvironment(),
         CCErrorList* errors = nullptr);
+
+    bool process(
+        const char* data,
+        std::size_t size,
+        std::string& output,
+        const CCEnvironment& env = CCEnvironment(),
+        CCErrorList* errors = nullptr);
+
+    bool process(
+        const std::wstring& source,
+        std::wstring& output,
+        const CCEnvironment& env = CCEnvironment(),
+        CCErrorList* errors = nullptr);
+
+    bool process(
+        const wchar_t* data,
+        std::size_t size,
+        std::wstring& output,
+        const CCEnvironment& env = CCEnvironment(),
+        CCErrorList* errors = nullptr);
 };
 ```
 
-- `source` — UTF-8 JavaScript with possible `@cc_on` blocks
-- `output` — UTF-8 plain JavaScript with CC expanded
+- Narrow strings contain UTF-8 JavaScript; wide strings use the platform's UTF-16 or UTF-32 `wchar_t` representation
+- Pointer overload sizes are code-unit counts and may include embedded null characters
+- Wide input is validated strictly; invalid surrogate sequences or Unicode code points return `false` without changing the source text copied to `output`
+- Error columns from wide overloads count `wchar_t` code units; existing errors supplied by the caller are left unchanged
 - `env` — environment with predefined and user variables
-- `errors` — optional, receives error list with line/column info
+- `errors` — optional, receives error messages as UTF-8 `std::string` values with line/column info
 - Returns `true` if no fatal errors
+
+Wide strings are converted at the API boundary and use the same scanner, parser, evaluator, and `CCEnvironment` as UTF-8 input. Environment variable names and string values therefore continue to use the existing UTF-8 `std::string` API.
 
 ### CCEnvironment
 
